@@ -1,0 +1,642 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../generated/mysql-client"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("MYSQL_DATABASE_URL")
+}
+
+model access_control {
+  id                                               Int                      @id @default(autoincrement())
+  employee_id                                      Int?
+  department_id                                    Int?
+  subdepartment_id                                 Int?
+  reporting_manager_id                             Int?
+  region_id                                        Int?
+  zone_id                                          Int?
+  city_id                                          Int?
+  created_at                                       DateTime?                @default(now()) @db.Timestamp(0)
+  updated_at                                       DateTime?                @default(now()) @db.Timestamp(0)
+  users_access_control_employee_idTousers          users?                   @relation("access_control_employee_idTousers", fields: [employee_id], references: [id], onUpdate: Restrict, map: "access_control_ibfk_1")
+  departments                                      departments?             @relation(fields: [department_id], references: [id], onUpdate: Restrict, map: "access_control_ibfk_2")
+  sub_department                                   sub_department?          @relation(fields: [subdepartment_id], references: [id], onUpdate: Restrict, map: "access_control_ibfk_3")
+  users_access_control_reporting_manager_idTousers users?                   @relation("access_control_reporting_manager_idTousers", fields: [reporting_manager_id], references: [id], onUpdate: Restrict, map: "access_control_ibfk_4")
+  regions                                          regions?                 @relation(fields: [region_id], references: [id], onUpdate: Restrict, map: "access_control_ibfk_5")
+  zones                                            zones?                   @relation(fields: [zone_id], references: [id], onUpdate: Restrict, map: "access_control_ibfk_6")
+  city                                             city?                    @relation(fields: [city_id], references: [id], onUpdate: Restrict, map: "access_control_ibfk_7")
+  access_control_cities                            access_control_cities[]
+  access_control_regions                           access_control_regions[]
+  access_control_zones                             access_control_zones[]
+
+  @@index([city_id], map: "city_id")
+  @@index([department_id], map: "department_id")
+  @@index([employee_id], map: "employee_id")
+  @@index([region_id], map: "region_id")
+  @@index([reporting_manager_id], map: "reporting_manager_id")
+  @@index([subdepartment_id], map: "subdepartment_id")
+  @@index([zone_id], map: "zone_id")
+}
+
+model access_control_cities {
+  id                Int            @id @default(autoincrement())
+  access_control_id Int
+  city_id           Int
+  created_at        DateTime?      @default(now()) @db.Timestamp(0)
+  access_control    access_control @relation(fields: [access_control_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "access_control_cities_ibfk_1")
+  city              city           @relation(fields: [city_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "access_control_cities_ibfk_2")
+
+  @@unique([access_control_id, city_id], map: "uq_ac_city")
+  @@index([city_id], map: "city_id")
+}
+
+model access_control_regions {
+  id                Int            @id @default(autoincrement())
+  access_control_id Int
+  region_id         Int
+  created_at        DateTime?      @default(now()) @db.Timestamp(0)
+  access_control    access_control @relation(fields: [access_control_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "access_control_regions_ibfk_1")
+  regions           regions        @relation(fields: [region_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "access_control_regions_ibfk_2")
+
+  @@unique([access_control_id, region_id], map: "uq_ac_region")
+  @@index([region_id], map: "region_id")
+}
+
+model access_control_zones {
+  id                Int            @id @default(autoincrement())
+  access_control_id Int
+  zone_id           Int
+  created_at        DateTime?      @default(now()) @db.Timestamp(0)
+  access_control    access_control @relation(fields: [access_control_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "access_control_zones_ibfk_1")
+  zones             zones          @relation(fields: [zone_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "access_control_zones_ibfk_2")
+
+  @@unique([access_control_id, zone_id], map: "uq_ac_zone")
+  @@index([zone_id], map: "zone_id")
+}
+
+model access_countries {
+  id           Int       @id @default(autoincrement())
+  country_name String?   @db.VarChar(255)
+  ceo_id       Int?
+  created_at   DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model attendance {
+  id                 Int                    @id @default(autoincrement())
+  employee_id        Int
+  attendance_date    DateTime               @db.Date
+  status             attendance_status      @default(Pending)
+  punch_in           DateTime?              @db.Time(0)
+  punch_out          DateTime?              @db.Time(0)
+  shift_type         attendance_shift_type? @default(Regular)
+  shift_timing       String?                @db.VarChar(100)
+  leave_type         attendance_leave_type?
+  remarks            String?                @db.Text
+  created_at         DateTime?              @default(now()) @db.Timestamp(0)
+  updated_at         DateTime?              @default(now()) @db.Timestamp(0)
+  worked_minutes     Int?                   @default(0)
+  overtime_minutes   Int?                   @default(0)
+  short_minutes      Int?                   @default(0)
+  late_minutes       Int?                   @default(0)
+  early_exit_minutes Int?                   @default(0)
+  users              users                  @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_attendance_employee")
+  comp_offs          comp_offs[]
+
+  @@unique([employee_id, attendance_date], map: "uk_employee_attendance")
+}
+
+model attendance_sync {
+  id          Int       @id @default(autoincrement())
+  last_record String    @db.VarChar(50)
+  updated_at  DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model background_verification {
+  id                  Int                                          @id @default(autoincrement())
+  employee_id         Int
+  overall_status      background_verification_overall_status?      @default(EMPTY_ENUM_VALUE)
+  remarks             String?                                      @db.Text
+  alternate_number    background_verification_alternate_number?    @default(EMPTY_ENUM_VALUE)
+  contact_number      background_verification_contact_number?      @default(EMPTY_ENUM_VALUE)
+  criminal_record     background_verification_criminal_record?     @default(EMPTY_ENUM_VALUE)
+  current_address     background_verification_current_address?     @default(EMPTY_ENUM_VALUE)
+  education_proof     background_verification_education_proof?     @default(EMPTY_ENUM_VALUE)
+  father_contact      background_verification_father_contact?      @default(EMPTY_ENUM_VALUE)
+  identity_proof      background_verification_identity_proof?      @default(EMPTY_ENUM_VALUE)
+  mother_contact      background_verification_mother_contact?      @default(EMPTY_ENUM_VALUE)
+  permanent_address   background_verification_permanent_address?   @default(EMPTY_ENUM_VALUE)
+  previous_employment background_verification_previous_employment? @default(EMPTY_ENUM_VALUE)
+  reference_check     background_verification_reference_check?     @default(EMPTY_ENUM_VALUE)
+  created_at          DateTime?                                    @default(now()) @db.Timestamp(0)
+  updated_at          DateTime?                                    @default(now()) @db.Timestamp(0)
+}
+
+model branches {
+  id          Int        @id @default(autoincrement())
+  uuid        String     @unique(map: "uuid") @db.Char(36)
+  branch_name String     @db.VarChar(100)
+  branch_code String     @unique(map: "branch_code") @db.VarChar(10)
+  location    String     @db.VarChar(150)
+  created_at  DateTime?  @default(now()) @db.Timestamp(0)
+  updated_at  DateTime?  @default(now()) @db.Timestamp(0)
+  holidays    holidays[]
+}
+
+model city {
+  id                    Int                     @id @default(autoincrement())
+  city_name             String                  @db.VarChar(100)
+  zone_id               Int
+  created_at            DateTime?               @default(now()) @db.Timestamp(0)
+  updated_at            DateTime?               @default(now()) @db.Timestamp(0)
+  access_control        access_control[]
+  access_control_cities access_control_cities[]
+}
+
+model comp_offs {
+  id            Int              @id @default(autoincrement())
+  uuid          String           @unique(map: "uuid") @db.Char(36)
+  employee_id   Int
+  attendance_id Int?
+  earned_date   DateTime         @db.Date
+  days          Decimal          @default(1.0) @db.Decimal(3, 1)
+  status        comp_offs_status @default(Available)
+  leave_id      Int?
+  remarks       String?          @db.VarChar(255)
+  created_at    DateTime?        @default(now()) @db.Timestamp(0)
+  updated_at    DateTime?        @default(now()) @db.Timestamp(0)
+  attendance    attendance?      @relation(fields: [attendance_id], references: [id], onUpdate: Restrict, map: "fk_comp_off_attendance")
+  users         users            @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_comp_off_employee")
+  leaves        leaves?          @relation(fields: [leave_id], references: [id], onUpdate: Restrict, map: "fk_comp_off_leave")
+
+  @@index([attendance_id], map: "fk_comp_off_attendance")
+  @@index([employee_id], map: "fk_comp_off_employee")
+  @@index([leave_id], map: "fk_comp_off_leave")
+}
+
+model departments {
+  id              Int              @id @default(autoincrement())
+  uuid            String           @unique(map: "uuid") @default(dbgenerated("(uuid())")) @db.Char(36)
+  department_name String           @unique(map: "department_name") @db.VarChar(100)
+  description     String?          @db.Text
+  is_active       Boolean?         @default(true)
+  created_at      DateTime?        @default(now()) @db.Timestamp(0)
+  updated_at      DateTime?        @default(now()) @db.Timestamp(0)
+  access_control  access_control[]
+  hos             hos[]
+  users           users[]
+}
+
+model employee_shift_override {
+  id           Int                                 @id @default(autoincrement())
+  employee_id  Int
+  from_date    DateTime                            @db.Date
+  to_date      DateTime                            @db.Date
+  shift_type   employee_shift_override_shift_type? @default(Temporary)
+  shift_timing String                              @db.VarChar(100)
+  week_off     employee_shift_override_week_off?
+  reason       String?                             @db.VarChar(255)
+  is_active    Boolean?                            @default(true)
+  created_at   DateTime?                           @default(now()) @db.Timestamp(0)
+  updated_at   DateTime?                           @default(now()) @db.Timestamp(0)
+  users        users                               @relation(fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_shift_override_employee")
+
+  @@index([employee_id], map: "fk_shift_override_employee")
+}
+
+model grademaster {
+  id          Int       @id @default(autoincrement())
+  gradeName   String    @db.VarChar(50)
+  designation String?   @db.VarChar(100)
+  created_at  DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model holidays {
+  id         Int       @id @default(autoincrement())
+  branch_id  Int
+  date       DateTime  @db.Date
+  year       Int
+  name       String    @db.VarChar(150)
+  is_active  Boolean?  @default(true)
+  created_at DateTime? @default(now()) @db.Timestamp(0)
+  updated_at DateTime? @default(now()) @db.Timestamp(0)
+  branches   branches  @relation(fields: [branch_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_holiday_branch")
+
+  @@unique([branch_id, date], map: "unique_branch_date")
+  @@index([branch_id, year], map: "idx_branch_year")
+}
+
+model hos {
+  id            Int          @id @default(autoincrement())
+  ho_name       String?      @db.VarChar(100)
+  department_id Int?
+  departments   departments? @relation(fields: [department_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "hos_ibfk_1")
+  users         users[]
+
+  @@index([department_id], map: "department_id")
+}
+
+model leaves {
+  id                              Int               @id @default(autoincrement())
+  uuid                            String            @unique(map: "uuid") @db.Char(36)
+  employee_id                     Int
+  leave_type                      leaves_leave_type
+  from_date                       DateTime          @db.Date
+  to_date                         DateTime          @db.Date
+  total_days                      Decimal           @db.Decimal(3, 1)
+  reason                          String?           @db.Text
+  status                          leaves_status?    @default(Pending)
+  applied_at                      DateTime?         @default(now()) @db.DateTime(0)
+  approved_by                     Int?
+  approved_at                     DateTime?         @db.DateTime(0)
+  rejection_reason                String?           @db.Text
+  created_at                      DateTime?         @default(now()) @db.Timestamp(0)
+  updated_at                      DateTime?         @default(now()) @db.Timestamp(0)
+  comp_offs                       comp_offs[]
+  users_leaves_approved_byTousers users?            @relation("leaves_approved_byTousers", fields: [approved_by], references: [id], onUpdate: Restrict, map: "fk_leave_approved_by")
+  users_leaves_employee_idTousers users             @relation("leaves_employee_idTousers", fields: [employee_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "fk_leave_employee")
+
+  @@index([approved_by], map: "fk_leave_approved_by")
+  @@index([employee_id], map: "fk_leave_employee")
+}
+
+model notices {
+  id          Int       @id @default(autoincrement())
+  title       String    @db.VarChar(255)
+  category    String    @db.VarChar(100)
+  notice_date DateTime  @db.Date
+  status      String    @db.VarChar(50)
+  description String?   @db.Text
+  created_at  DateTime? @default(now()) @db.Timestamp(0)
+  updated_at  DateTime? @default(now()) @db.Timestamp(0)
+}
+
+model policies {
+  id             Int                     @id @default(autoincrement())
+  title          String                  @db.VarChar(255)
+  category       String                  @db.VarChar(100)
+  description    String                  @db.Text
+  fileUrl        String?                 @db.Text
+  version        String?                 @default("1.0") @db.VarChar(20)
+  lastUpdated    DateTime?               @default(now()) @db.DateTime(0)
+  status         policies_status?        @default(pending)
+  created_at     DateTime?               @default(now()) @db.Timestamp(0)
+  updated_at     DateTime?               @default(now()) @db.Timestamp(0)
+  hr_head_status policies_hr_head_status @default(pending)
+  hr_head_remark String?                 @db.Text
+  sho_status     policies_sho_status     @default(pending)
+  sho_remark     String?                 @db.Text
+
+  @@index([category], map: "idx_category")
+  @@index([status], map: "idx_status")
+}
+
+model regions {
+  id                     Int                      @id @default(autoincrement())
+  region_name            String                   @db.VarChar(100)
+  country_id             Int
+  bdm_id                 Int?
+  created_at             DateTime?                @default(now()) @db.Timestamp(0)
+  updated_at             DateTime?                @default(now()) @db.Timestamp(0)
+  access_control         access_control[]
+  access_control_regions access_control_regions[]
+}
+
+model roles {
+  id               Int             @id @default(autoincrement())
+  uuid             String          @unique(map: "uuid") @db.VarChar(100)
+  role_name        String          @db.VarChar(100)
+  subDepartment_id Int?
+  created_at       DateTime?       @default(now()) @db.Timestamp(0)
+  updated_at       DateTime?       @default(now()) @db.Timestamp(0)
+  sub_department   sub_department? @relation(fields: [subDepartment_id], references: [id], onDelete: Restrict, map: "fk_role_subdepartment")
+  users            users[]
+
+  @@unique([role_name, subDepartment_id], map: "uk_role_department")
+  @@index([subDepartment_id], map: "fk_role_subdepartment")
+}
+
+model statecities {
+  id       Int     @id @default(autoincrement())
+  cityName String  @db.VarChar(100)
+  state_id Int?
+  states   states? @relation(fields: [state_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "statecities_ibfk_1")
+
+  @@index([state_id], map: "state_id")
+}
+
+model states {
+  id          Int           @id @default(autoincrement())
+  stateName   String        @db.VarChar(100)
+  statecities statecities[]
+}
+
+model sub_department {
+  id                 Int              @id @default(autoincrement())
+  subDepartment_name String?          @db.VarChar(100)
+  department_id      Int
+  is_active          Boolean          @default(true)
+  created_at         DateTime         @default(now()) @db.DateTime(0)
+  updated_at         DateTime         @default(now()) @db.DateTime(0)
+  access_control     access_control[]
+  roles              roles[]
+
+  @@index([department_id], map: "idx_department_id")
+}
+
+model users {
+  id                                                        Int                       @id @default(autoincrement())
+  employeeId                                                String?                   @unique(map: "employee_id") @db.VarChar(50)
+  tempId                                                    String?                   @db.VarChar(50)
+  uuid                                                      String                    @unique(map: "uuid") @db.Char(36)
+  firstName                                                 String?                   @db.VarChar(255)
+  middleName                                                String?                   @db.VarChar(100)
+  lastName                                                  String?                   @db.VarChar(100)
+  dateOfBirth                                               DateTime?                 @db.Date
+  gender                                                    String?                   @db.VarChar(20)
+  maritalStatus                                             String?                   @db.VarChar(20)
+  bloodGroup                                                String?                   @db.VarChar(10)
+  personalEmail                                             String?                   @db.VarChar(150)
+  mobile                                                    String?                   @db.VarChar(20)
+  alternateNumber                                           String?                   @db.VarChar(20)
+  localRelation                                             String?                   @db.VarChar(50)
+  localName                                                 String?                   @db.VarChar(100)
+  currentAddress                                            String?                   @db.Text
+  currentCity                                               String?                   @db.VarChar(100)
+  currentState                                              String?                   @db.VarChar(100)
+  currentPincode                                            String?                   @db.VarChar(20)
+  currentAddressProofUploaded                               String?                   @db.VarChar(255)
+  permanentAddress                                          String?                   @db.Text
+  permanentCity                                             String?                   @db.VarChar(100)
+  permanentState                                            String?                   @db.VarChar(100)
+  permanentPincode                                          String?                   @db.VarChar(20)
+  permanentAddressProofUploaded                             String?                   @db.VarChar(255)
+  pfNumber                                                  String?                   @db.VarChar(50)
+  esicNumber                                                String?                   @db.VarChar(50)
+  uanNumber                                                 String?                   @db.VarChar(50)
+  bankName                                                  String?                   @db.VarChar(150)
+  accountHolderName                                         String?                   @db.VarChar(150)
+  accountNumber                                             String?                   @db.VarChar(50)
+  ifscCode                                                  String?                   @db.VarChar(20)
+  branch                                                    String?                   @db.VarChar(150)
+  accountType                                               String?                   @db.VarChar(50)
+  upiId                                                     String?                   @db.VarChar(100)
+  education                                                 String?                   @db.LongText
+  experience                                                String?                   @db.LongText
+  fatherName                                                String?                   @db.VarChar(150)
+  fatherRelation                                            String?                   @default("Father") @db.VarChar(100)
+  fatherContact                                             String?                   @db.VarChar(20)
+  fatherOccupation                                          String?                   @db.VarChar(150)
+  motherName                                                String?                   @db.VarChar(150)
+  motherRelation                                            String?                   @default("Mother") @db.VarChar(100)
+  motherContact                                             String?                   @db.VarChar(20)
+  motherOccupation                                          String?                   @db.VarChar(150)
+  spouseName                                                String?                   @db.VarChar(150)
+  spouseRelation                                            String?                   @db.VarChar(100)
+  spouseContact                                             String?                   @db.VarChar(20)
+  spouseOccupation                                          String?                   @db.VarChar(150)
+  siblingName                                               String?                   @db.VarChar(255)
+  siblingRelation                                           String?                   @db.VarChar(255)
+  siblingContact                                            String?                   @db.VarChar(20)
+  siblingOccupation                                         String?                   @db.VarChar(255)
+  aadhaarUploaded                                           String?                   @db.VarChar(255)
+  panUploaded                                               String?                   @db.VarChar(255)
+  resumeUploaded                                            String?                   @db.VarChar(255)
+  twelthCertificateUploaded                                 String?                   @db.VarChar(255)
+  graduationCertificateUploaded                             String?                   @db.VarChar(255)
+  passportPhotoUploaded                                     String?                   @db.VarChar(255)
+  qrCodeUploaded                                            String?                   @db.VarChar(255)
+  signatureUploaded                                         String?                   @db.VarChar(255)
+  password                                                  String?                   @db.VarChar(255)
+  username                                                  String?                   @db.VarChar(100)
+  role_id                                                   Int?
+  department_id                                             Int?
+  subDepartment_id                                          Int?
+  manager_id                                                Int?
+  is_active                                                 Boolean?                  @default(true)
+  refreshToken                                              String?                   @db.VarChar(255)
+  joiningDate                                               String?                   @db.VarChar(100)
+  confirmationDate                                          String?                   @db.VarChar(100)
+  employeeStatus                                            String?                   @db.VarChar(100)
+  grade                                                     String?                   @db.VarChar(20)
+  designation                                               String?                   @db.VarChar(100)
+  noticePeriod                                              String?                   @db.VarChar(50)
+  hrManager                                                 String?                   @db.VarChar(255)
+  probationTenure                                           String?                   @db.VarChar(50)
+  employmentType                                            String?                   @db.VarChar(100)
+  workLocation                                              String?                   @db.VarChar(100)
+  zoneName                                                  String?                   @db.VarChar(100)
+  workShift                                                 String?                   @db.VarChar(100)
+  weeklyoff                                                 String?                   @db.VarChar(50)
+  ctc                                                       String?                   @db.VarChar(100)
+  basicSalary                                               String?                   @db.VarChar(100)
+  shiftTiming                                               String?                   @db.VarChar(50)
+  hrPolicyAccepted                                          String?                   @db.Text
+  commitmentDeclarationAccepted                             String?                   @db.Text
+  informationDeclarationAccepted                            String?                   @db.Text
+  status                                                    String?                   @default("pending") @db.VarChar(50)
+  formLink                                                  String?                   @db.VarChar(255)
+  created_at                                                DateTime?                 @default(now()) @db.DateTime(0)
+  updated_at                                                DateTime?                 @default(now()) @db.DateTime(0)
+  branchOffice_id                                           String?                   @db.VarChar(100)
+  companyName                                               String?                   @db.VarChar(255)
+  officeEmail                                               String?                   @db.VarChar(100)
+  officeNumber                                              String?                   @db.VarChar(100)
+  aliasName                                                 String?                   @db.VarChar(255)
+  shortName                                                 String?                   @db.VarChar(20)
+  employeeType                                              String?                   @db.VarChar(50)
+  access_role                                               String?                   @db.VarChar(50)
+  ho_id                                                     Int?
+  is_online                                                 Boolean                   @default(false)
+  emp_code                                                  String?                   @db.VarChar(50)
+  access_control_access_control_employee_idTousers          access_control[]          @relation("access_control_employee_idTousers")
+  access_control_access_control_reporting_manager_idTousers access_control[]          @relation("access_control_reporting_manager_idTousers")
+  attendance                                                attendance[]
+  comp_offs                                                 comp_offs[]
+  employee_shift_override                                   employee_shift_override[]
+  leaves_leaves_approved_byTousers                          leaves[]                  @relation("leaves_approved_byTousers")
+  leaves_leaves_employee_idTousers                          leaves[]                  @relation("leaves_employee_idTousers")
+  departments                                               departments?              @relation(fields: [department_id], references: [id], map: "fk_user_department")
+  users                                                     users?                    @relation("usersTousers", fields: [manager_id], references: [id], map: "fk_user_manager")
+  other_users                                               users[]                   @relation("usersTousers")
+  roles                                                     roles?                    @relation(fields: [role_id], references: [id], onDelete: Restrict, map: "fk_user_role")
+  hos                                                       hos?                      @relation(fields: [ho_id], references: [id], map: "fk_users_ho")
+
+  @@index([department_id], map: "fk_user_department")
+  @@index([manager_id], map: "fk_user_manager")
+  @@index([role_id], map: "fk_user_role")
+  @@index([ho_id], map: "fk_users_ho")
+}
+
+model zones {
+  id                   Int                    @id @default(autoincrement())
+  zone_name            String                 @db.VarChar(100)
+  region_id            Int
+  zonal_manager_id     Int?
+  created_at           DateTime?              @default(now()) @db.Timestamp(0)
+  updated_at           DateTime?              @default(now()) @db.Timestamp(0)
+  access_control       access_control[]
+  access_control_zones access_control_zones[]
+}
+
+enum background_verification_overall_status {
+  verified
+  failed
+  pending
+  EMPTY_ENUM_VALUE @map("")
+}
+
+enum attendance_status {
+  Present
+  Absent
+  Half_Day @map("Half Day")
+  Leave
+  WeekOff
+  Holiday
+  Pending
+}
+
+enum leaves_leave_type {
+  Casual_Leave    @map("Casual Leave")
+  Sick_Leave      @map("Sick Leave")
+  Paid_Leave      @map("Paid Leave")
+  Unpaid_Leave    @map("Unpaid Leave")
+  Comp_Off        @map("Comp Off")
+  Maternity_Leave @map("Maternity Leave")
+  Paternity_Leave @map("Paternity Leave")
+}
+
+enum employee_shift_override_shift_type {
+  Regular
+  Temporary
+}
+
+enum background_verification_alternate_number {
+  verified
+  failed
+  pending
+  EMPTY_ENUM_VALUE @map("")
+}
+
+enum background_verification_contact_number {
+  verified
+  failed
+  pending
+  EMPTY_ENUM_VALUE @map("")
+}
+
+enum attendance_shift_type {
+  Regular
+  Temporary
+}
+
+enum employee_shift_override_week_off {
+  Monday
+  Tuesday
+  Wednesday
+  Thursday
+  Friday
+  Saturday
+  Sunday
+}
+
+enum comp_offs_status {
+  Available
+  Used
+}
+
+enum background_verification_criminal_record {
+  verified
+  failed
+  pending
+  EMPTY_ENUM_VALUE @map("")
+}
+
+enum policies_status {
+  active
+  pending
+  inactive
+}
+
+enum background_verification_current_address {
+  verified
+  failed
+  pending
+  EMPTY_ENUM_VALUE @map("")
+}
+
+enum attendance_leave_type {
+  Sick_Leave   @map("Sick Leave")
+  Casual_Leave @map("Casual Leave")
+  Earned_Leave @map("Earned Leave")
+  Unpaid_Leave @map("Unpaid Leave")
+  Comp_Off     @map("Comp Off")
+}
+
+enum leaves_status {
+  Pending
+  Approved
+  Rejected
+  Cancelled
+}
+
+enum background_verification_education_proof {
+  verified
+  failed
+  pending
+  EMPTY_ENUM_VALUE @map("")
+}
+
+enum background_verification_father_contact {
+  verified
+  failed
+  pending
+  EMPTY_ENUM_VALUE @map("")
+}
+
+enum policies_hr_head_status {
+  pending
+  approved
+  rejected
+}
+
+enum background_verification_identity_proof {
+  verified
+  failed
+  pending
+  EMPTY_ENUM_VALUE @map("")
+}
+
+enum background_verification_mother_contact {
+  verified
+  failed
+  pending
+  EMPTY_ENUM_VALUE @map("")
+}
+
+enum policies_sho_status {
+  pending
+  approved
+  rejected
+}
+
+enum background_verification_permanent_address {
+  verified
+  failed
+  pending
+  EMPTY_ENUM_VALUE @map("")
+}
+
+enum background_verification_previous_employment {
+  verified
+  failed
+  pending
+  EMPTY_ENUM_VALUE @map("")
+}
+
+enum background_verification_reference_check {
+  verified
+  failed
+  pending
+  EMPTY_ENUM_VALUE @map("")
+}

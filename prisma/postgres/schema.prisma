@@ -1,0 +1,325 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../../generated/postgres-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("POSTGRES_DATABASE_URL")
+}
+
+enum HierarchyLevel {
+  ADMIN
+  HOD
+  MANAGER
+  TEAM_LEAD
+  EMPLOYEE
+}
+
+enum GoalType {
+  LONG_TERM
+  ONGOING
+  URGENT
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum GoalStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ActivityStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum PerformancePeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum RewardType {
+  BADGE
+  CERTIFICATE
+  BONUS
+  CASH
+  GIFT
+  APPRECIATION
+}
+
+enum RewardStatus {
+  PENDING
+  ISSUED
+  CANCELLED
+}
+
+enum AchievementLevel {
+  BRONZE
+  SILVER
+  GOLD
+  PLATINUM
+}
+
+// Maps a MySQL roles.id (sub-department-specific role name) to a
+// hierarchy level used for permission checks. Populate this table
+// once per MySQL role so app code never hardcodes role strings.
+model RoleLevelMap {
+  id          String         @id @default(cuid())
+  mysqlRoleId Int            @unique // matches `roles.id` in MySQL
+  roleName    String // cached label, e.g. "SEO Executive"
+  level       HierarchyLevel
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Notification {
+  id String @id @default(cuid())
+
+  userId Int // MySQL users.id — no relation, cross-database
+
+  title   String
+  message String
+  type    String
+  isRead  Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([userId, isRead])
+}
+
+model Goal {
+  id String @id @default(cuid())
+
+  title       String
+  description String?
+
+  goalType GoalType
+  priority Priority   @default(MEDIUM)
+  status   GoalStatus @default(PENDING)
+
+  progress Int @default(0)
+
+  startDate DateTime
+  dueDate   DateTime
+
+  createdById  Int // MySQL users.id
+  assignedToId Int // MySQL users.id
+
+  tasks Task[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([assignedToId])
+  @@index([createdById])
+  @@index([status])
+  @@index([goalType])
+  @@index([startDate])
+  @@index([dueDate])
+  @@index([assignedToId, status])
+}
+
+model Task {
+  id String @id @default(cuid())
+
+  goalId String
+  goal   Goal   @relation(fields: [goalId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+
+  priority Priority   @default(MEDIUM)
+  status   TaskStatus @default(PENDING)
+
+  progress Int @default(0)
+
+  estimatedHours Float?
+
+  startDate   DateTime
+  dueDate     DateTime
+  completedAt DateTime?
+
+  createdById  Int // MySQL users.id
+  assignedToId Int // MySQL users.id
+
+  activities Activity[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([goalId])
+  @@index([assignedToId])
+  @@index([createdById])
+  @@index([status])
+  @@index([startDate])
+  @@index([dueDate])
+  @@index([assignedToId, status])
+}
+
+model Activity {
+  id String @id @default(cuid())
+
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+
+  priority Priority       @default(MEDIUM)
+  status   ActivityStatus @default(PENDING)
+
+  progress Int @default(0)
+
+  startedAt DateTime?
+
+  completedAt      DateTime?
+  estimatedMinutes Int?
+
+  actualMinutes Int @default(0)
+
+  pausedAt  DateTime?
+  resumedAt DateTime?
+
+  totalPauseMinutes Int @default(0)
+
+  startDate DateTime  @default(now())
+  dueDate   DateTime?
+
+  createdById  Int // MySQL users.id
+  assignedToId Int // MySQL users.id
+
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+  history   ActivityHistory[]
+
+  @@index([taskId])
+  @@index([assignedToId])
+  @@index([createdById])
+  @@index([status])
+  @@index([startDate])
+  @@index([dueDate])
+  @@index([assignedToId, status])
+}
+
+model ActivityHistory {
+  id String @id @default(cuid())
+
+  activityId String
+  activity   Activity @relation(fields: [activityId], references: [id], onDelete: Cascade)
+
+  userId Int // MySQL users.id
+
+  action  String
+  remarks String?
+
+  oldValue Json?
+  newValue Json?
+
+  createdAt DateTime @default(now())
+}
+
+model Performance {
+  id String @id @default(cuid())
+
+  userId Int // MySQL users.id
+
+  period PerformancePeriod
+
+  startDate DateTime
+  endDate   DateTime
+
+  totalGoals     Int @default(0)
+  completedGoals Int @default(0)
+
+  totalTasks     Int @default(0)
+  completedTasks Int @default(0)
+
+  totalActivities     Int @default(0)
+  completedActivities Int @default(0)
+
+  completionRate Float @default(0)
+
+  productivityScore Float @default(0)
+  qualityScore      Float @default(0)
+
+  performanceScore Float @default(0)
+
+  remarks String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  rewards Reward[]
+
+  @@unique([userId, period, startDate], name: "userId_period_startDate")
+  @@index([userId])
+  @@index([period])
+}
+
+model Achievement {
+  id String @id @default(cuid())
+
+  userId Int // MySQL users.id
+
+  title       String
+  description String?
+  badge       String
+
+  level  AchievementLevel
+  points Int              @default(0)
+
+  unlockedAt DateTime @default(now())
+  createdAt  DateTime @default(now())
+
+  @@unique([userId, badge])
+  @@index([userId])
+}
+
+model Reward {
+  id String @id @default(cuid())
+
+  userId Int // MySQL users.id
+
+  performanceId String?
+  performance   Performance? @relation(fields: [performanceId], references: [id], onDelete: SetNull)
+
+  title       String
+  description String?
+  badge       String?
+
+  rewardType RewardType
+  status     RewardStatus @default(PENDING)
+
+  amount Decimal? @db.Decimal(10, 2)
+  points Int      @default(0)
+
+  issuedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+}

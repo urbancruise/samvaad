@@ -1,0 +1,19 @@
+const TASK_STATUS = {
+  PENDING: "PENDING",
+  IN_PROGRESS: "IN_PROGRESS",
+  REVIEW: "REVIEW",
+  COMPLETED: "COMPLETED",
+  CANCELLED: "CANCELLED",
+};
+
+const PRIORITY = {
+  LOW: "LOW",
+  MEDIUM: "MEDIUM",
+  HIGH: "HIGH",
+  CRITICAL: "CRITICAL",
+};
+
+module.exports = {
+  TASK_STATUS,
+  PRIORITY,
+};

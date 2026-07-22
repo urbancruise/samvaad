@@ -1,0 +1,25 @@
+const GOAL_TYPE = {
+  LONG_TERM: "LONG_TERM",
+  ONGOING: "ONGOING",
+  URGENT: "URGENT",
+};
+
+const GOAL_STATUS = {
+  PENDING: "PENDING",
+  IN_PROGRESS: "IN_PROGRESS",
+  COMPLETED: "COMPLETED",
+  CANCELLED: "CANCELLED",
+};
+
+const PRIORITY = {
+  LOW: "LOW",
+  MEDIUM: "MEDIUM",
+  HIGH: "HIGH",
+  CRITICAL: "CRITICAL",
+};
+
+module.exports = {
+  GOAL_TYPE,
+  GOAL_STATUS,
+  PRIORITY,
+};
