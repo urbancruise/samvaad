@@ -13,7 +13,7 @@ app.use(
   cors({
     origin: [
       "http://localhost:3000",
-      "https://sambaad-frontend-git-main-urbancruise-5527s-projects.vercel.app/"
+      "https://sambaad-frontend-git-main-urbancruise-5527s-projects.vercel.app"
     ],
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
