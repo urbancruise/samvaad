@@ -11,5 +11,8 @@ router.use("/performance", require("../module/performance/performance.route"));
 router.use("/notifications", require("../module/notifications/notification.routes"));
 router.use("/team", require("../module/teamLead/teamLead.route"));
 router.use("/teamlead/team", require("../module/teamLead/team/team.route"));
+router.use("/manager", require("../module/manager/manager.route"));
+router.use("/hod", require("../module/hod/hod.route"));
+router.use("/admin", require("../module/admin/admin.route.js"));
 
 module.exports = router;

@@ -69,7 +69,7 @@ const refreshToken = generateRefreshToken(tokenUser);
         firstName: user.firstName,
         lastName: user.lastName,
         username: user.username,
-        role: user.access_role,        // <-- this is your real role field
+        role: user.access_role,
         department_id: user.department_id,
         subDepartment_id: user.subDepartment_id,
         manager_id: user.manager_id,
