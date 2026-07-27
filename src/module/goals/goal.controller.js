@@ -22,7 +22,6 @@ const { canManageEmployee } = require("../teamLead/teamLead.permission");
 
 const createGoal = asyncHandler(async (req, res) => {
   const data = createGoalSchema.parse(req.body);
-  console.log("this is gooooooooal",req.body);
   
   const targetEmployeeId = data.assignedToId || req.user.id;
   console.log(targetEmployeeId)

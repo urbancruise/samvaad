@@ -7,7 +7,10 @@ const auth = require("../../middlewares/auth.middleware");
 const {
   getPerformanceDashboard,
   getAchievements,
-  getPerformanceAnalytics
+  getPerformanceAnalytics,
+  getUserPerformanceDashboard,
+  getUserAchievements,
+  getUserPerformanceAnalytics,
 } = require("./performance.controller");
 
 router.get(
@@ -26,6 +29,24 @@ router.get(
     "/analytics",
     auth,
     getPerformanceAnalytics
+);
+
+router.get(
+    "/:userId/dashboard",
+    auth,
+    getUserPerformanceDashboard
+);
+
+router.get(
+    "/:userId/achievements",
+    auth,
+    getUserAchievements
+);
+
+router.get(
+    "/:userId/analytics",
+    auth,
+    getUserPerformanceAnalytics
 );
 
 
