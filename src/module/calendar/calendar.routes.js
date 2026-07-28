@@ -9,7 +9,10 @@ const {
   getMonthlyCalendar,
   rescheduleEvent,
   getCalendarSearch,
-  getCalendarAnalytics
+  getCalendarAnalytics,
+  getUserCalendarEvents,
+  getUserTodayAgenda,
+  getUserWeeklyAgenda,
 } = require("./calendar.controller");
 
 router.use(auth);
@@ -47,6 +50,23 @@ router.get(
 router.get(
     "/analytics",
     getCalendarAnalytics
+);
+
+// Generic "view someone else's calendar" — no collision with the literal
+// routes above since these require a userId path segment first.
+router.get(
+    "/:userId/events",
+    getUserCalendarEvents
+);
+
+router.get(
+    "/:userId/today",
+    getUserTodayAgenda
+);
+
+router.get(
+    "/:userId/week",
+    getUserWeeklyAgenda
 );
 
 module.exports = router;

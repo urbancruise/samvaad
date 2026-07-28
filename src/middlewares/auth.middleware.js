@@ -3,32 +3,35 @@ const ApiError = require("../utils/ApiError");
 
 const auth = (req, res, next) => {
   try {
-    let accessToken = null;
 
-    // Cookie
+    const candidates = [];
+
     if (req.cookies?.accessToken) {
-    accessToken = req.cookies.accessToken;
-}
+      candidates.push(req.cookies.accessToken);
+    }
 
-    // Authorization Header
-    if (!accessToken && req.headers.authorization) {
-      const bearer = req.headers.authorization;
+    if (req.headers.authorization?.startsWith("Bearer ")) {
+      candidates.push(req.headers.authorization.split(" ")[1]);
+    }
 
-      if (bearer.startsWith("Bearer ")) {
-        accessToken = bearer.split(" ")[1];
+    if (candidates.length === 0) {
+      return next(new ApiError(401, "Unauthorized"));
+    }
+
+    let lastError = null;
+
+    for (const token of candidates) {
+      try {
+        req.user = jwt.verify(token, process.env.JWT_SECRET);
+        return next();
+      } catch (err) {
+        lastError = err;
+        // try the next candidate, if any
       }
     }
 
-    if (!accessToken) {
-      return next(new ApiError(401, "Unauthorized"));
-      res.redirect('/')
-    }
-
-    const decoded = jwt.verify(accessToken, process.env.JWT_SECRET);
-
-    req.user = decoded;
-
-    next();
+    // Every candidate failed verification.
+    return next(new ApiError(401, "Invalid accessToken"));
   } catch (err) {
     next(new ApiError(401, "Invalid accessToken"));
   }
