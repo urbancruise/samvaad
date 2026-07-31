@@ -369,3 +369,154 @@ enum RaterType {
   SELF
   SENIOR
 }
+
+enum ConversationType {
+  DIRECT
+  GROUP
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  SYSTEM
+}
+
+enum MessageStatus {
+  SENT
+  DELIVERED
+  READ
+}
+
+model Conversation {
+  id String @id @default(cuid())
+
+  type ConversationType
+
+  title String?
+
+  imageUrl String?
+
+  createdBy Int
+
+  lastMessageId String?
+
+  lastMessageAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members ConversationMember[]
+
+  messages Message[]
+
+  @@index([createdBy])
+  @@index([lastMessageAt])
+}
+
+model ConversationMember {
+  id String @id @default(cuid())
+
+  conversationId String
+  conversation Conversation
+    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  userId Int
+
+  joinedAt DateTime @default(now())
+
+  leftAt DateTime?
+
+  isMuted Boolean @default(false)
+
+  isPinned Boolean @default(false)
+
+  lastReadMessageId String?
+
+  lastReadAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@unique([conversationId, userId])
+
+  @@index([userId])
+
+  @@index([conversationId])
+}
+
+model Message {
+  id String @id @default(cuid())
+
+  conversationId String
+
+  conversation Conversation
+    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  senderId Int
+
+  type MessageType @default(TEXT)
+
+  content String?
+
+  attachmentUrl String?
+
+  attachmentName String?
+
+  attachmentSize Int?
+
+  mimeType String?
+
+  replyToId String?
+
+  editedAt DateTime?
+
+  deletedForEveryone Boolean @default(false)
+
+  status MessageStatus @default(SENT)
+
+  createdAt DateTime @default(now())
+
+  updatedAt DateTime @updatedAt
+
+  @@index([conversationId])
+
+  @@index([senderId])
+
+  @@index([createdAt])
+
+  @@index([replyToId])
+}
+
+model MessageRead {
+  id String @id @default(cuid())
+
+  messageId String
+
+  userId Int
+
+  readAt DateTime @default(now())
+
+  @@unique([messageId, userId])
+
+  @@index([userId])
+
+  @@index([messageId])
+}
+
+model MessageDelete {
+  id String @id @default(cuid())
+
+  messageId String
+
+  userId Int
+
+  deletedAt DateTime @default(now())
+
+  @@unique([messageId, userId])
+
+  @@index([userId])
+
+  @@index([messageId])
+}

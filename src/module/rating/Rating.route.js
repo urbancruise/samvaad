@@ -10,7 +10,7 @@ const {
   getTeamRating,
   submitSelfRating,
   submitSeniorRating,
-} = require("./rating.controller");
+} = require("./Rating.controller");
 
 router.use(auth);
 
