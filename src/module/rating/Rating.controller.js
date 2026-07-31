@@ -9,7 +9,7 @@ const {
   getTeamRatingService,
   upsertSelfRatingService,
   upsertSeniorRatingService,
-} = require("./rating.service");
+} = require("./Rating.service");
 
 const currentPeriod = () => {
   const now = new Date();
