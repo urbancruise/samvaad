@@ -1,8 +1,8 @@
 const buildCalendarEvents = ({
-  goals,
-  tasks,
-  activities,
-}) => {
+  goals = [],
+  tasks = [],
+  activities = [],
+} = {}) => {
 
   return [
 
@@ -26,7 +26,7 @@ const buildCalendarEvents = ({
       status: task.status,
       priority: task.priority,
       taskId: task.id,
-      goalId: goal.id,
+      goalId: task.goalId,
     })),
 
     ...activities.map(activity => ({
@@ -40,19 +40,16 @@ const buildCalendarEvents = ({
       progress: activity.progress,
       activityId: activity.id,
       taskId: activity.taskId,
-      goalId: activity.task.goalId,
+      goalId: activity.task?.goalId ?? null,
     })),
   ];
 
 };
 
 const buildTodayAgenda = ({
-  goals,
-  tasks,
-  activities,
-  goalId,
-  taskId,
-  activityId
+  goals = [],
+  tasks = [],
+  activities = [],
 }) => {
 
   const agenda = [
@@ -95,7 +92,10 @@ const buildTodayAgenda = ({
     if (!a.start) return 1;
     if (!b.start) return -1;
 
-    return new Date(a.start) - new Date(b.start);
+    return (
+    new Date(a.start).getTime() -
+    new Date(b.start).getTime()
+);
 
   });
 
@@ -105,9 +105,9 @@ const buildTodayAgenda = ({
 
 
 const buildWeeklyAgenda = ({
-  goals,
-  tasks,
-  activities,
+  goals = [],
+  tasks = [],
+  activities = [],
 }) => {
 
   const week = {
@@ -167,9 +167,10 @@ const getEventColor = (
     }
 
     if (
-        status !== "COMPLETED" &&
-        new Date(dueDate) < new Date()
-    ) {
+    dueDate &&
+    status !== "COMPLETED" &&
+    new Date(dueDate) < new Date()
+) {
 
         return EVENT_COLORS.OVERDUE;
 
@@ -177,10 +178,11 @@ const getEventColor = (
 
     const today = new Date();
 
-    if (
-        new Date(dueDate).toDateString() ===
-        today.toDateString()
-    ) {
+   if (
+    dueDate &&
+    new Date(dueDate).toDateString() ===
+    today.toDateString()
+) {
 
         return EVENT_COLORS.TODAY;
 
@@ -202,10 +204,10 @@ const getEventColor = (
 };
 
 const buildMonthlyCalendar = ({
-    goals,
-    tasks,
-    activities,
-}) => {
+    goals = [],
+    tasks = [],
+    activities = [],
+} = {}) => {
 
     return [
 
@@ -234,6 +236,7 @@ const buildMonthlyCalendar = ({
                 goal.status,
                 goal.dueDate
             ),
+            navigationUrl: `/goals/${goal.id}`,
 
             extendedProps: {
 
@@ -258,12 +261,17 @@ const buildMonthlyCalendar = ({
         ...tasks.map(task => ({
 
             id: task.id,
+            type: "TASK",
 
             title: task.title,
 
             start: task.startDate,
+            status: task.status,
 
             end: task.dueDate,
+            priority: task.priority,
+    taskId: task.id,
+    goalId: task.goalId,
 
             backgroundColor: getEventColor(
                 "TASK",
@@ -277,7 +285,7 @@ const buildMonthlyCalendar = ({
                 task.priority,
                 task.status,
                 task.dueDate
-            ),
+            ),navigationUrl: `/tasks/${task.id}`,
 
             extendedProps: {
 
@@ -302,12 +310,23 @@ const buildMonthlyCalendar = ({
         ...activities.map(activity => ({
 
             id: activity.id,
+            type: "ACTIVITY",
+           
 
             title: activity.title,
 
             start: activity.startDate,
 
             end: activity.dueDate,
+             status: activity.status,
+
+    priority: activity.priority,
+
+    progress: activity.progress,
+
+    taskId: activity.taskId,
+
+    goalId: activity.task?.goalId ?? null,
 
             backgroundColor: getEventColor(
                 "ACTIVITY",
@@ -322,6 +341,7 @@ const buildMonthlyCalendar = ({
                 activity.status,
                 activity.dueDate
             ),
+            navigationUrl: `/activities/${activity.id}`,
 
             extendedProps: {
 
@@ -333,7 +353,7 @@ const buildMonthlyCalendar = ({
 
                 progress: activity.progress,
 
-                goalId: activity.task.goalId,
+                goalId: activity.task?.goalId ?? null,
 
                 taskId: activity.taskId,
 

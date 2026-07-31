@@ -52,8 +52,6 @@ router.get(
     getCalendarAnalytics
 );
 
-// Generic "view someone else's calendar" — no collision with the literal
-// routes above since these require a userId path segment first.
 router.get(
     "/:userId/events",
     getUserCalendarEvents

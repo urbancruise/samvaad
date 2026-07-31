@@ -258,6 +258,22 @@ exports.Prisma.RewardScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.RatingScalarFieldEnum = {
+  id: 'id',
+  employeeId: 'employeeId',
+  raterId: 'raterId',
+  raterType: 'raterType',
+  period: 'period',
+  departmentId: 'departmentId',
+  salesScore: 'salesScore',
+  conductScore: 'conductScore',
+  contributionScore: 'contributionScore',
+  achievementPercent: 'achievementPercent',
+  extraFields: 'extraFields',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -355,6 +371,11 @@ exports.RewardStatus = exports.$Enums.RewardStatus = {
   CANCELLED: 'CANCELLED'
 };
 
+exports.RaterType = exports.$Enums.RaterType = {
+  SELF: 'SELF',
+  SENIOR: 'SENIOR'
+};
+
 exports.Prisma.ModelName = {
   RoleLevelMap: 'RoleLevelMap',
   Notification: 'Notification',
@@ -364,7 +385,8 @@ exports.Prisma.ModelName = {
   ActivityHistory: 'ActivityHistory',
   Performance: 'Performance',
   Achievement: 'Achievement',
-  Reward: 'Reward'
+  Reward: 'Reward',
+  Rating: 'Rating'
 };
 
 /**

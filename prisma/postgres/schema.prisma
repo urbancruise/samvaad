@@ -81,9 +81,7 @@ enum AchievementLevel {
   PLATINUM
 }
 
-// Maps a MySQL roles.id (sub-department-specific role name) to a
-// hierarchy level used for permission checks. Populate this table
-// once per MySQL role so app code never hardcodes role strings.
+
 model RoleLevelMap {
   id          String         @id @default(cuid())
   mysqlRoleId Int            @unique // matches `roles.id` in MySQL
@@ -323,4 +321,51 @@ model Reward {
   updatedAt DateTime @updatedAt
 
   @@index([userId])
+}
+
+
+
+model Rating {
+  id        String @id @default(cuid())
+
+  // Both are MySQL user ids — no FK relation across DBs, same pattern
+  // as every other cross-DB reference in this app (Goal/Task/Activity).
+  employeeId Int   // the person being rated
+  raterId    Int   // whoever actually submitted this row
+
+  raterType RaterType // SELF | SENIOR — exactly 2 rows per employee per period
+
+  period String // "YYYY-MM", e.g. "2026-07"
+
+  // Snapshot of department at time of rating (not a live FK) — so
+  // department-filtered history stays accurate even if someone
+  // transfers departments later.
+  departmentId Int?
+
+  salesScore        Int? // 1-5
+  conductScore      Int? // 1-5
+  contributionScore Int? // 1-5
+
+  achievementPercent Float?
+
+  // Department-specific text fields (e.g. "Sales Improvement Ideas" for
+  // Sales, something else for other departments) — see
+  // rating.fieldConfig.js on the backend for the per-department key
+  // list. Stored as a flexible JSON blob rather than fixed columns
+  // since the field set varies by department and is meant to be easy
+  // to extend without a migration each time.
+  extraFields Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Exactly one SELF row and one SENIOR row per employee per period.
+  @@unique([employeeId, raterType, period])
+  @@index([employeeId, period])
+  @@index([departmentId, period])
+}
+
+enum RaterType {
+  SELF
+  SENIOR
 }

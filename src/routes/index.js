@@ -14,5 +14,6 @@ router.use("/teamlead/team", require("../module/teamLead/team/team.route"));
 router.use("/manager", require("../module/manager/manager.route"));
 router.use("/hod", require("../module/hod/hod.route"));
 router.use("/admin", require("../module/admin/admin.route.js"));
+router.use("/rating", require("../module/rating/Rating.route.js"));
 
 module.exports = router;

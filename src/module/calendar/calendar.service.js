@@ -27,20 +27,30 @@ const getCalendarEventsService = async (userId, start, end) => {
     if (!end) {
       startDate.setDate(1);
       startDate.setHours(0, 0, 0, 0);
+
       endDate.setMonth(startDate.getMonth() + 1, 0);
       endDate.setHours(23, 59, 59, 999);
     }
 
-    const data = await getCalendarData(userId, startDate, endDate);
-    const events = buildCalendarEvents(data);
+    const data = await getCalendarData(
+      userId,
+      startDate,
+      endDate
+    );
 
-    return buildMonthlyCalendar(events);
+    // FIX:
+    // buildMonthlyCalendar expects
+    // { goals, tasks, activities }
+    return buildMonthlyCalendar(data);
+
   } catch (error) {
-    console.error("Error in getCalendarEventsService:", error);
+    console.error(
+      "Error in getCalendarEventsService:",
+      error
+    );
     throw error;
   }
 };
-
 const getTodayAgendaService = async (userId) => {
   try {
     const data = await getTodayAgenda(userId);

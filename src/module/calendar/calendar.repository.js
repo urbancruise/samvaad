@@ -22,14 +22,21 @@ const getCalendarData = async (userId, start, end) => {
         },
       }),
       postgresDb.activity.findMany({
-        where: {
-          assignedToId: userId,
-          OR: [
-            { startDate: { gte: start, lte: end } },
-            { dueDate: { gte: start, lte: end } },
-          ],
-        },
-      }),
+  where: {
+    assignedToId: userId,
+    OR: [
+      { startDate: { gte: start, lte: end } },
+      { dueDate: { gte: start, lte: end } },
+    ],
+  },
+  include: {
+    task: {
+      select: {
+        goalId: true,
+      },
+    },
+  },
+}),
     ]);
 
     return { goals, tasks, activities };
@@ -61,11 +68,21 @@ const getTodayAgenda = async (userId) => {
         },
       }),
       postgresDb.activity.findMany({
-        where: {
-          assignedToId: userId,
-          startDate: { gte: today, lt: tomorrow },
-        },
-      }),
+  where: {
+    assignedToId: userId,
+    startDate: {
+      gte: today,
+      lt: tomorrow,
+    },
+  },
+  include: {
+    task: {
+      select: {
+        goalId: true,
+      },
+    },
+  },
+}),
     ]);
 
     return { goals, tasks, activities };
@@ -91,11 +108,21 @@ const getWeeklyAgenda = async (userId, weekStart, weekEnd) => {
         },
       }),
       postgresDb.activity.findMany({
-        where: {
-          assignedToId: userId,
-          startDate: { gte: weekStart, lte: weekEnd },
-        },
-      }),
+  where: {
+    assignedToId: userId,
+    startDate: {
+      gte: weekStart,
+      lte: weekEnd,
+    },
+  },
+  include: {
+    task: {
+      select: {
+        goalId: true,
+      },
+    },
+  },
+}),
     ]);
 
     return { goals, tasks, activities };
@@ -147,16 +174,27 @@ const getMonthlyCalendar = async (userId, startDate, endDate, filters) => {
 
     if (types.includes("ACTIVITY")) {
       promises.push(
-        postgresDb.activity.findMany({
-          where: {
-            assignedToId: userId,
-            priority: priorityFilter,
-            status: statusFilter,
-            startDate: { lte: endDate },
-            dueDate: { gte: startDate },
-          },
-        })
-      );
+  postgresDb.activity.findMany({
+    where: {
+      assignedToId: userId,
+      priority: priorityFilter,
+      status: statusFilter,
+      startDate: {
+        lte: endDate,
+      },
+      dueDate: {
+        gte: startDate,
+      },
+    },
+    include: {
+      task: {
+        select: {
+          goalId: true,
+        },
+      },
+    },
+  })
+);
     } else {
       promises.push([]);
     }
@@ -267,16 +305,25 @@ const searchCalendar = async (userId, filters) => {
 
     if (types.includes("ACTIVITY")) {
       promises.push(
-        postgresDb.activity.findMany({
-          where: {
-            assignedToId: userId,
-            title: searchFilter,
-            priority: priorityFilter,
-            status: statusFilter,
-            startDate: Object.keys(dateFilter).length ? dateFilter : undefined,
-          },
-        })
-      );
+  postgresDb.activity.findMany({
+    where: {
+      assignedToId: userId,
+      title: searchFilter,
+      priority: priorityFilter,
+      status: statusFilter,
+      startDate: Object.keys(dateFilter).length
+        ? dateFilter
+        : undefined,
+    },
+    include: {
+      task: {
+        select: {
+          goalId: true,
+        },
+      },
+    },
+  })
+);
     } else {
       promises.push([]);
     }
