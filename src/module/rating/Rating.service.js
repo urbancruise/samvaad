@@ -13,7 +13,7 @@ const {
   getRatingRows,
   getRatingRowsForTeam,
   upsertRatingRow,
-} = require("./rating.repository");
+} = require("./Rating.repository");
 
 /**
  * 5-band classification, applied to the OFFICIAL/final score — the
