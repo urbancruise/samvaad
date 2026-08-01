@@ -328,38 +328,24 @@ model Reward {
 model Rating {
   id        String @id @default(cuid())
 
-  // Both are MySQL user ids — no FK relation across DBs, same pattern
-  // as every other cross-DB reference in this app (Goal/Task/Activity).
-  employeeId Int   // the person being rated
-  raterId    Int   // whoever actually submitted this row
+  employeeId Int  
+  raterId    Int  
 
-  raterType RaterType // SELF | SENIOR — exactly 2 rows per employee per period
+  raterType RaterType 
+  period String 
 
-  period String // "YYYY-MM", e.g. "2026-07"
-
-  // Snapshot of department at time of rating (not a live FK) — so
-  // department-filtered history stays accurate even if someone
-  // transfers departments later.
   departmentId Int?
 
-  salesScore        Int? // 1-5
-  conductScore      Int? // 1-5
-  contributionScore Int? // 1-5
-
+  salesScore        Int? 
+  conductScore      Int? 
+  contributionScore Int? 
   achievementPercent Float?
 
-  // Department-specific text fields (e.g. "Sales Improvement Ideas" for
-  // Sales, something else for other departments) — see
-  // rating.fieldConfig.js on the backend for the per-department key
-  // list. Stored as a flexible JSON blob rather than fixed columns
-  // since the field set varies by department and is meant to be easy
-  // to extend without a migration each time.
   extraFields Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Exactly one SELF row and one SENIOR row per employee per period.
   @@unique([employeeId, raterType, period])
   @@index([employeeId, period])
   @@index([departmentId, period])
@@ -369,154 +355,3 @@ enum RaterType {
   SELF
   SENIOR
 }
-
-// enum ConversationType {
-//   DIRECT
-//   GROUP
-// }
-
-// enum MessageType {
-//   TEXT
-//   IMAGE
-//   VIDEO
-//   AUDIO
-//   DOCUMENT
-//   SYSTEM
-// }
-
-// enum MessageStatus {
-//   SENT
-//   DELIVERED
-//   READ
-// }
-
-// model Conversation {
-//   id String @id @default(cuid())
-
-//   type ConversationType
-
-//   title String?
-
-//   imageUrl String?
-
-//   createdBy Int
-
-//   lastMessageId String?
-
-//   lastMessageAt DateTime?
-
-//   createdAt DateTime @default(now())
-//   updatedAt DateTime @updatedAt
-
-//   members ConversationMember[]
-
-//   messages Message[]
-
-//   @@index([createdBy])
-//   @@index([lastMessageAt])
-// }
-
-// model ConversationMember {
-//   id String @id @default(cuid())
-
-//   conversationId String
-//   conversation Conversation
-//     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-
-//   userId Int
-
-//   joinedAt DateTime @default(now())
-
-//   leftAt DateTime?
-
-//   isMuted Boolean @default(false)
-
-//   isPinned Boolean @default(false)
-
-//   lastReadMessageId String?
-
-//   lastReadAt DateTime?
-
-//   createdAt DateTime @default(now())
-
-//   @@unique([conversationId, userId])
-
-//   @@index([userId])
-
-//   @@index([conversationId])
-// }
-
-// model Message {
-//   id String @id @default(cuid())
-
-//   conversationId String
-
-//   conversation Conversation
-//     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-
-//   senderId Int
-
-//   type MessageType @default(TEXT)
-
-//   content String?
-
-//   attachmentUrl String?
-
-//   attachmentName String?
-
-//   attachmentSize Int?
-
-//   mimeType String?
-
-//   replyToId String?
-
-//   editedAt DateTime?
-
-//   deletedForEveryone Boolean @default(false)
-
-//   status MessageStatus @default(SENT)
-
-//   createdAt DateTime @default(now())
-
-//   updatedAt DateTime @updatedAt
-
-//   @@index([conversationId])
-
-//   @@index([senderId])
-
-//   @@index([createdAt])
-
-//   @@index([replyToId])
-// }
-
-// model MessageRead {
-//   id String @id @default(cuid())
-
-//   messageId String
-
-//   userId Int
-
-//   readAt DateTime @default(now())
-
-//   @@unique([messageId, userId])
-
-//   @@index([userId])
-
-//   @@index([messageId])
-// }
-
-// model MessageDelete {
-//   id String @id @default(cuid())
-
-//   messageId String
-
-//   userId Int
-
-//   deletedAt DateTime @default(now())
-
-//   @@unique([messageId, userId])
-
-//   @@index([userId])
-
-//   @@index([messageId])
-// }

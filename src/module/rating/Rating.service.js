@@ -1,18 +1,19 @@
 const ApiError = require("../../utils/ApiError");
 const { normalizeRole, isTopLevel } = require("../../utils/hierarchy.service");
-const { getFieldConfig } = require("./Rating.fieldconfig");
+const { getFieldConfig } = require("./rating.fieldConfig");
 
 const {
   formatName,
   getAllDepartments,
   getDepartmentById,
+  getDepartmentsByIds,
   getDirectReports,
   getAllUsersForRating,
   findUserWithManager,
   getRatingRows,
   getRatingRowsForTeam,
   upsertRatingRow,
-} = require("./Rating.repository");
+} = require("./rating.repository");
 
 /**
  * 5-band classification, applied to the OFFICIAL/final score — the
@@ -160,47 +161,50 @@ const getTeamRatingService = async (viewerId, viewerRole, { department, period }
   const employeeIds = employees.map((e) => e.id);
   const rows = await getRatingRowsForTeam(employeeIds, period);
 
+  // One query for every department involved, instead of one query PER
+  // employee inside the loop below (an N+1 that got slower the bigger
+  // the team was — a real contributor to the slow load times).
+  const deptMap = await getDepartmentsByIds(employees.map((e) => e.department_id));
+
   const allTotals = [];
   const bandCounts = Object.fromEntries(RATING_BANDS.map((b) => [b.key, 0]));
 
-  const shaped = await Promise.all(
-    employees.map(async (emp) => {
-      const empRows = rows.filter((r) => r.employeeId === emp.id);
-      const selfRow = empRows.find((r) => r.raterType === "SELF");
-      const seniorRow = empRows.find((r) => r.raterType === "SENIOR");
+  const shaped = employees.map((emp) => {
+    const empRows = rows.filter((r) => r.employeeId === emp.id);
+    const selfRow = empRows.find((r) => r.raterType === "SELF");
+    const seniorRow = empRows.find((r) => r.raterType === "SENIOR");
 
-      if (selfRow) allTotals.push(computeTotal(selfRow));
-      if (seniorRow) allTotals.push(computeTotal(seniorRow));
+    if (selfRow) allTotals.push(computeTotal(selfRow));
+    if (seniorRow) allTotals.push(computeTotal(seniorRow));
 
-      const overall = getOverall(selfRow, seniorRow);
-      // Only count someone toward a band once their official (senior)
-      // rating exists — an all-null row would otherwise pile up in
-      // "Do or Die" just for not having been rated yet.
-      if (overall.isFinal) {
-        bandCounts[overall.band.key] += 1;
-      }
+    const overall = getOverall(selfRow, seniorRow);
+    // Only count someone toward a band once their official (senior)
+    // rating exists — an all-null row would otherwise pile up in
+    // "Do or Die" just for not having been rated yet.
+    if (overall.isFinal) {
+      bandCounts[overall.band.key] += 1;
+    }
 
-      const dept = await getDepartmentById(emp.department_id);
+    const dept = deptMap.get(Number(emp.department_id)) ?? null;
 
-      return {
-        id: emp.id,
-        fullName: formatName(emp),
-        role: emp.access_role,
-        departmentId: emp.department_id,
-        departmentName: dept?.name ?? null,
-        fields: getFieldConfig(dept?.name),
-        self: shapeRow(selfRow),
-        senior: shapeRow(seniorRow),
-        overall,
-        // The list mixes the viewer's own record with their actual
-        // direct reports (or, for SUPER_ADMIN, everyone) — only the
-        // latter should ever be senior-editable. Without this, the
-        // frontend can't tell "my own row" apart from "someone I
-        // manage" and would let people submit their own senior score.
-        canEditSenior: Number(emp.id) !== Number(viewerId),
-      };
-    })
-  );
+    return {
+      id: emp.id,
+      fullName: formatName(emp),
+      role: emp.access_role,
+      departmentId: emp.department_id,
+      departmentName: dept?.name ?? null,
+      fields: getFieldConfig(dept?.name),
+      self: shapeRow(selfRow),
+      senior: shapeRow(seniorRow),
+      overall,
+      // The list mixes the viewer's own record with their actual
+      // direct reports (or, for SUPER_ADMIN, everyone) — only the
+      // latter should ever be senior-editable. Without this, the
+      // frontend can't tell "my own row" apart from "someone I
+      // manage" and would let people submit their own senior score.
+      canEditSenior: Number(emp.id) !== Number(viewerId),
+    };
+  });
 
   const teamAverage = allTotals.length
     ? Number((allTotals.reduce((a, b) => a + b, 0) / allTotals.length).toFixed(1))

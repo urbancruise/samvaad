@@ -10,7 +10,7 @@ const formatName = (u) => `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim();
 const getAllDepartments = async () => {
   return mysqlDb.departments.findMany({
     select: { id: true, department_name: true },
-    orderBy: { department_name: "asc" },
+    orderBy: { name: "asc" },
   });
 };
 
@@ -20,6 +20,21 @@ const getDepartmentById = async (departmentId) => {
     where: { id: Number(departmentId) },
     select: { id: true, department_name: true },
   });
+};
+
+// Batched version — one query for many department ids instead of one
+// query PER employee inside a loop (the N+1 pattern getTeamRatingService
+// used to have). Returns a Map for O(1) lookup by id.
+const getDepartmentsByIds = async (departmentIds) => {
+  const uniqueIds = [...new Set(departmentIds.filter(Boolean).map(Number))];
+  if (uniqueIds.length === 0) return new Map();
+
+  const departments = await mysqlDb.departments.findMany({
+    where: { id: { in: uniqueIds } },
+    select: { id: true, department_name: true },
+  });
+
+  return new Map(departments.map((d) => [d.id, d]));
 };
 
 // Direct reports only — matches the "Self + one direct senior" rule.
@@ -140,6 +155,7 @@ module.exports = {
   formatName,
   getAllDepartments,
   getDepartmentById,
+  getDepartmentsByIds,
   getDirectReports,
   getAllUsersForRating,
   findUserWithManager,
