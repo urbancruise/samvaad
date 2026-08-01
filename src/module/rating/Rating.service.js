@@ -1,6 +1,6 @@
 const ApiError = require("../../utils/ApiError");
 const { normalizeRole, isTopLevel } = require("../../utils/hierarchy.service");
-const { getFieldConfig } = require("./rating.fieldConfig");
+const { getFieldConfig } = require("./Rating.fieldConfig");
 
 const {
   formatName,
