@@ -24,14 +24,13 @@ app.use(
 
 app.use("/api/v1", routes);
 
-// 404 Fallback Route
+
 app.use((req, res, next) => {
   const error = new Error(`Not Found - ${req.originalUrl}`);
   res.status(404);
   next(error);
 });
 
-// The Error Handler MUST be the last middleware registered
 app.use(errorHandler);
 
 module.exports = app;

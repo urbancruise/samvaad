@@ -10,7 +10,7 @@ const formatName = (u) => `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim();
 const getAllDepartments = async () => {
   return mysqlDb.departments.findMany({
     select: { id: true, department_name: true },
-    orderBy: { name: "asc" },
+    orderBy: { department_name: "asc" },
   });
 };
 
