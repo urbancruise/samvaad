@@ -1,7 +1,7 @@
 const { Server } = require("socket.io"); // npm install socket.io, if not already present
 const jwt = require("jsonwebtoken");
 
-const { setEmitter, dispatchDueScheduledEmails } = require("./email.service");
+const { setEmitter, dispatchDueScheduledEmails } = require("./Email.service");
 
 let io = null;
 

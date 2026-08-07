@@ -26,7 +26,7 @@ const {
   deleteLabel,
   getSignature,
   upsertSignature,
-} = require("./email.repository");
+} = require("./Email.repository");
 
 // Injected from email.socket.js at server startup — avoids a circular
 // require between the service and the socket layer. Falls back to a

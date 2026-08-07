@@ -24,7 +24,7 @@ const {
   deleteLabel,
   getSignature,
   upsertSignature,
-} = require("./email.controller");
+} = require("./Email.controller");
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, path.join(__dirname, "../../../uploads/email")),

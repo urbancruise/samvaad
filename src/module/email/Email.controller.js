@@ -21,7 +21,7 @@ const {
   deleteLabelService,
   getSignatureService,
   upsertSignatureService,
-} = require("./email.service");
+} = require("./Email.service");
 
 const createDraft = asyncHandler(async (req, res) => {
   const draft = await createDraftService(req.user.id, req.body);
