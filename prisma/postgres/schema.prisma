@@ -355,3 +355,131 @@ enum RaterType {
   SELF
   SENIOR
 }
+
+// ============================================
+// Append to prisma/postgres/schema.prisma, then:
+//   npx prisma migrate dev --name add-email --schema=prisma/postgres/schema.prisma
+// ============================================
+
+model EmailThread {
+  id             String   @id @default(cuid())
+  subject        String
+  lastActivityAt DateTime @default(now())
+
+  emails Email[]
+
+  @@index([lastActivityAt])
+}
+
+model Email {
+  id       String @id @default(cuid())
+  threadId String
+
+  fromId Int // MySQL user id — sender
+
+  subject  String
+  bodyHtml String @db.Text
+  bodyText String? @db.Text // plain-text fallback, used for search/preview
+
+  isDraft     Boolean   @default(false)
+  scheduledAt DateTime? // Schedule Send — a background dispatcher flips isDraft/sentAt when due
+  sentAt      DateTime?
+
+  // Reply/Reply-All/Forward chain — null for the first email in a thread
+  inReplyToId String?
+
+  // For Schedule Send only — the intended {to, cc, bcc} user-id lists,
+  // held here until the dispatcher actually sends it (at which point
+  // real EmailRecipient rows get created and this is cleared). Not
+  // used for anything already sent.
+  pendingRecipients Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  thread      EmailThread       @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  recipients  EmailRecipient[]
+  attachments EmailAttachment[]
+
+  @@index([fromId])
+  @@index([threadId])
+  @@index([scheduledAt])
+}
+
+/**
+ * One row per (email, person, role) — this is the per-mailbox state.
+ * The SENDER gets a row too (type SENDER, folder SENT), so "delete
+ * from my Sent folder" never touches the recipient's Inbox copy, and
+ * vice versa — same as real email/IMAP.
+ */
+model EmailRecipient {
+  id      String @id @default(cuid())
+  emailId String
+  userId  Int // MySQL user id
+
+  type RecipientType
+
+  folder      EmailFolder @default(INBOX)
+  isRead      Boolean     @default(false)
+  isStarred   Boolean     @default(false)
+  isImportant Boolean     @default(false)
+  labels      String[]    @default([])
+
+  deletedAt DateTime? // soft-delete into Trash; a cron can hard-delete after 30 days
+
+  email Email @relation(fields: [emailId], references: [id], onDelete: Cascade)
+
+  @@unique([emailId, userId, type])
+  @@index([userId, folder])
+  @@index([userId, isRead])
+  @@index([userId, isStarred])
+}
+
+enum RecipientType {
+  TO
+  CC
+  BCC
+  SENDER
+}
+
+enum EmailFolder {
+  INBOX
+  SENT
+  DRAFTS
+  SCHEDULED
+  SPAM
+  TRASH
+  ARCHIVE
+}
+
+model EmailAttachment {
+  id       String @id @default(cuid())
+  emailId  String
+  fileName String
+  fileUrl  String
+  fileSize Int
+  mimeType String
+
+  createdAt DateTime @default(now())
+
+  email Email @relation(fields: [emailId], references: [id], onDelete: Cascade)
+
+  @@index([emailId])
+}
+
+model EmailLabel {
+  id     String @id @default(cuid())
+  userId Int
+  name   String
+  color  String @default("#64748b")
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model EmailSignature {
+  id      String @id @default(cuid())
+  userId  Int    @unique
+  content String @db.Text
+  isAutoAppend Boolean @default(true)
+}

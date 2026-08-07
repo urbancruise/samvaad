@@ -274,6 +274,65 @@ exports.Prisma.RatingScalarFieldEnum = {
   updatedAt: 'updatedAt'
 };
 
+exports.Prisma.EmailThreadScalarFieldEnum = {
+  id: 'id',
+  subject: 'subject',
+  lastActivityAt: 'lastActivityAt'
+};
+
+exports.Prisma.EmailScalarFieldEnum = {
+  id: 'id',
+  threadId: 'threadId',
+  fromId: 'fromId',
+  subject: 'subject',
+  bodyHtml: 'bodyHtml',
+  bodyText: 'bodyText',
+  isDraft: 'isDraft',
+  scheduledAt: 'scheduledAt',
+  sentAt: 'sentAt',
+  inReplyToId: 'inReplyToId',
+  pendingRecipients: 'pendingRecipients',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.EmailRecipientScalarFieldEnum = {
+  id: 'id',
+  emailId: 'emailId',
+  userId: 'userId',
+  type: 'type',
+  folder: 'folder',
+  isRead: 'isRead',
+  isStarred: 'isStarred',
+  isImportant: 'isImportant',
+  labels: 'labels',
+  deletedAt: 'deletedAt'
+};
+
+exports.Prisma.EmailAttachmentScalarFieldEnum = {
+  id: 'id',
+  emailId: 'emailId',
+  fileName: 'fileName',
+  fileUrl: 'fileUrl',
+  fileSize: 'fileSize',
+  mimeType: 'mimeType',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.EmailLabelScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  name: 'name',
+  color: 'color'
+};
+
+exports.Prisma.EmailSignatureScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  content: 'content',
+  isAutoAppend: 'isAutoAppend'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -376,6 +435,23 @@ exports.RaterType = exports.$Enums.RaterType = {
   SENIOR: 'SENIOR'
 };
 
+exports.RecipientType = exports.$Enums.RecipientType = {
+  TO: 'TO',
+  CC: 'CC',
+  BCC: 'BCC',
+  SENDER: 'SENDER'
+};
+
+exports.EmailFolder = exports.$Enums.EmailFolder = {
+  INBOX: 'INBOX',
+  SENT: 'SENT',
+  DRAFTS: 'DRAFTS',
+  SCHEDULED: 'SCHEDULED',
+  SPAM: 'SPAM',
+  TRASH: 'TRASH',
+  ARCHIVE: 'ARCHIVE'
+};
+
 exports.Prisma.ModelName = {
   RoleLevelMap: 'RoleLevelMap',
   Notification: 'Notification',
@@ -386,7 +462,13 @@ exports.Prisma.ModelName = {
   Performance: 'Performance',
   Achievement: 'Achievement',
   Reward: 'Reward',
-  Rating: 'Rating'
+  Rating: 'Rating',
+  EmailThread: 'EmailThread',
+  Email: 'Email',
+  EmailRecipient: 'EmailRecipient',
+  EmailAttachment: 'EmailAttachment',
+  EmailLabel: 'EmailLabel',
+  EmailSignature: 'EmailSignature'
 };
 
 /**

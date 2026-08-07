@@ -15,5 +15,6 @@ router.use("/manager", require("../module/manager/manager.route"));
 router.use("/hod", require("../module/hod/hod.route"));
 router.use("/admin", require("../module/admin/admin.route.js"));
 router.use("/rating", require("../module/rating/Rating.route.js"));
+router.use("/email", require("../module/email/Email.route.js"));
 
 module.exports = router;

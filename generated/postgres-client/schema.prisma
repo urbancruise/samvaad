@@ -325,38 +325,24 @@ model Reward {
 model Rating {
   id String @id @default(cuid())
 
-  // Both are MySQL user ids — no FK relation across DBs, same pattern
-  // as every other cross-DB reference in this app (Goal/Task/Activity).
-  employeeId Int // the person being rated
-  raterId    Int // whoever actually submitted this row
+  employeeId Int
+  raterId    Int
 
-  raterType RaterType // SELF | SENIOR — exactly 2 rows per employee per period
+  raterType RaterType
+  period    String
 
-  period String // "YYYY-MM", e.g. "2026-07"
-
-  // Snapshot of department at time of rating (not a live FK) — so
-  // department-filtered history stays accurate even if someone
-  // transfers departments later.
   departmentId Int?
 
-  salesScore        Int? // 1-5
-  conductScore      Int? // 1-5
-  contributionScore Int? // 1-5
-
+  salesScore         Int?
+  conductScore       Int?
+  contributionScore  Int?
   achievementPercent Float?
 
-  // Department-specific text fields (e.g. "Sales Improvement Ideas" for
-  // Sales, something else for other departments) — see
-  // rating.fieldConfig.js on the backend for the per-department key
-  // list. Stored as a flexible JSON blob rather than fixed columns
-  // since the field set varies by department and is meant to be easy
-  // to extend without a migration each time.
   extraFields Json?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Exactly one SELF row and one SENIOR row per employee per period.
   @@unique([employeeId, raterType, period])
   @@index([employeeId, period])
   @@index([departmentId, period])
@@ -365,4 +351,132 @@ model Rating {
 enum RaterType {
   SELF
   SENIOR
+}
+
+// ============================================
+// Append to prisma/postgres/schema.prisma, then:
+//   npx prisma migrate dev --name add-email --schema=prisma/postgres/schema.prisma
+// ============================================
+
+model EmailThread {
+  id             String   @id @default(cuid())
+  subject        String
+  lastActivityAt DateTime @default(now())
+
+  emails Email[]
+
+  @@index([lastActivityAt])
+}
+
+model Email {
+  id       String @id @default(cuid())
+  threadId String
+
+  fromId Int // MySQL user id — sender
+
+  subject  String
+  bodyHtml String  @db.Text
+  bodyText String? @db.Text // plain-text fallback, used for search/preview
+
+  isDraft     Boolean   @default(false)
+  scheduledAt DateTime? // Schedule Send — a background dispatcher flips isDraft/sentAt when due
+  sentAt      DateTime?
+
+  // Reply/Reply-All/Forward chain — null for the first email in a thread
+  inReplyToId String?
+
+  // For Schedule Send only — the intended {to, cc, bcc} user-id lists,
+  // held here until the dispatcher actually sends it (at which point
+  // real EmailRecipient rows get created and this is cleared). Not
+  // used for anything already sent.
+  pendingRecipients Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  thread      EmailThread       @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  recipients  EmailRecipient[]
+  attachments EmailAttachment[]
+
+  @@index([fromId])
+  @@index([threadId])
+  @@index([scheduledAt])
+}
+
+/**
+ * One row per (email, person, role) — this is the per-mailbox state.
+ * The SENDER gets a row too (type SENDER, folder SENT), so "delete
+ * from my Sent folder" never touches the recipient's Inbox copy, and
+ * vice versa — same as real email/IMAP.
+ */
+model EmailRecipient {
+  id      String @id @default(cuid())
+  emailId String
+  userId  Int // MySQL user id
+
+  type RecipientType
+
+  folder      EmailFolder @default(INBOX)
+  isRead      Boolean     @default(false)
+  isStarred   Boolean     @default(false)
+  isImportant Boolean     @default(false)
+  labels      String[]    @default([])
+
+  deletedAt DateTime? // soft-delete into Trash; a cron can hard-delete after 30 days
+
+  email Email @relation(fields: [emailId], references: [id], onDelete: Cascade)
+
+  @@unique([emailId, userId, type])
+  @@index([userId, folder])
+  @@index([userId, isRead])
+  @@index([userId, isStarred])
+}
+
+enum RecipientType {
+  TO
+  CC
+  BCC
+  SENDER
+}
+
+enum EmailFolder {
+  INBOX
+  SENT
+  DRAFTS
+  SCHEDULED
+  SPAM
+  TRASH
+  ARCHIVE
+}
+
+model EmailAttachment {
+  id       String @id @default(cuid())
+  emailId  String
+  fileName String
+  fileUrl  String
+  fileSize Int
+  mimeType String
+
+  createdAt DateTime @default(now())
+
+  email Email @relation(fields: [emailId], references: [id], onDelete: Cascade)
+
+  @@index([emailId])
+}
+
+model EmailLabel {
+  id     String @id @default(cuid())
+  userId Int
+  name   String
+  color  String @default("#64748b")
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+model EmailSignature {
+  id           String  @id @default(cuid())
+  userId       Int     @unique
+  content      String  @db.Text
+  isAutoAppend Boolean @default(true)
 }

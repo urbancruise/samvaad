@@ -85,7 +85,7 @@ const getCurrentUser = asyncHandler(async (req, res) => {
     throw new ApiError(404, "User not found");
   }
   
-  if (!user.isActive) {
+  if (!user.is_active) {
     throw new ApiError(403, "Account disabled");
   }
 
@@ -105,30 +105,43 @@ const logoutUser = asyncHandler(async (req, res) => {
 
 const refreshToken = asyncHandler(async (req, res) => {
   try {
-    const token = req.cookies.refreshToken;
+    // 1. Check cookies FIRST, fallback to JSON body (allows Postman testing)
+    const token = req.cookies?.refreshToken || req.body?.refreshToken;
+
     if (!token) {
-      throw new ApiError(401, "Unauthorized");
+      throw new ApiError(401, "Refresh token missing");
     }
+
     const decoded = jwt.verify(token, process.env.REFRESH_TOKEN_SECRET);
     const user = await getUserById(decoded.id);
-    if (!user || !user.isActive) {
-      throw new ApiError(401, "Unauthorized");
+
+    // 2. FIXED: Changed user.isActive -> user.is_active
+    if (!user || !user.is_active) {
+      throw new ApiError(401, "User not found or account disabled");
     }
 
-    const accessToken = generateAccessToken(user);
-    const newRefreshToken = generateRefreshToken(user);
+    // 3. Keep payload consistent with loginUser
+    const tokenUser = {
+      id: user.id,
+      role: user.access_role,
+    };
+
+    const accessToken = generateAccessToken(tokenUser);
+    const newRefreshToken = generateRefreshToken(tokenUser);
+
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
+    };
 
     res.cookie("accessToken", accessToken, {
-      httpOnly: true,
-      secure: false,
-      sameSite: "lax",
+      ...cookieOptions,
       maxAge: 15 * 60 * 1000,
     });
 
     res.cookie("refreshToken", newRefreshToken, {
-      httpOnly: true,
-      secure: false,
-      sameSite: "lax",
+      ...cookieOptions,
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
@@ -137,14 +150,14 @@ const refreshToken = asyncHandler(async (req, res) => {
         200,
         {
           accessToken,
-          refreshToken: newRefreshToken
+          refreshToken: newRefreshToken,
         },
-        "Token Refreshed"
+        "Token Refreshed Successfully"
       )
     );
   } catch (error) {
     if (error instanceof ApiError) throw error;
-    throw new ApiError(401, "Refresh Token Expired");
+    throw new ApiError(401, "Invalid or Expired Refresh Token");
   }
 });
 
