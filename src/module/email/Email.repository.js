@@ -22,10 +22,10 @@ const findUsersForRecipientSearch = async (query) => {
     where: {
       is_active: true,
       OR: [
-        { firstName: { contains: query, mode: "insensitive" } },
-        { lastName: { contains: query, mode: "insensitive" } },
-        { username: { contains: query, mode: "insensitive" } },
-        { officeEmail: { contains: query, mode: "insensitive" } },
+        { firstName: { contains: query } },
+        { lastName: { contains: query } },
+        { username: { contains: query } },
+        { officeEmail: { contains: query } },
       ],
     },
     select: { id: true, firstName: true, lastName: true, officeEmail: true, username: true },
