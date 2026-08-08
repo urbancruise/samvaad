@@ -16,7 +16,7 @@ app.use(
       "https://sambaad-frontend.vercel.app"
     ],
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
     exposedHeaders: ["Location", "Set-Cookie"]
   })
