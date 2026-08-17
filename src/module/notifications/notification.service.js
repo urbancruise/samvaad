@@ -5,13 +5,14 @@ const {
   markAllNotificationsAsRead,
 } = require("./notification.repository");
 
-const sendNotification = async ({ userId, title, message, type }) => {
+const sendNotification = async ({ userId, title, message, type, link }) => {
   try {
     return await createNotification({
       userId,
       title,
       message,
       type,
+      link: link ?? null,
     });
   } catch (error) {
     console.error(`Error dispatching standard notification to user ${userId}:`, error);
@@ -75,6 +76,25 @@ const sendActivityAssignedNotification = async ({ userId, activityTitle }) => {
   }
 };
 
+/**
+ * New — used by the Email module so a new message shows up in the
+ * persistent notification bell too, not just the real-time toast.
+ */
+const sendEmailReceivedNotification = async ({ userId, fromName, subject, threadId }) => {
+  try {
+    return await sendNotification({
+      userId,
+      title: "New Email",
+      message: `${fromName ? `${fromName}: ` : ""}${subject || "(no subject)"}`,
+      type: "EMAIL_RECEIVED",
+      link: `/email/thread/${threadId}`,
+    });
+  } catch (error) {
+    console.error(`Error sending email-received alert to user ${userId}:`, error);
+    throw error;
+  }
+};
+
 const getNotificationsService = async (userId) => {
   try {
     const notifications = await getNotificationsByUser(userId);
@@ -109,6 +129,7 @@ module.exports = {
   sendActivityCompletedNotification,
   sendTaskAssignedNotification,
   sendActivityAssignedNotification,
+  sendEmailReceivedNotification,
   getNotificationsService,
   markNotificationReadService,
   markAllNotificationsReadService,

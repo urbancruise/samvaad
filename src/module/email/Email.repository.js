@@ -114,6 +114,23 @@ const findRecipientRow = async (emailId, userId) => {
   });
 };
 
+// Batched — the TO recipients for many emails at once, used by the
+// folder listing to show "To: X" in Sent/Drafts/Scheduled instead of
+// always showing the current user's own name as "From".
+const getToRecipientsForEmails = async (emailIds) => {
+  const rows = await postgresDb.emailRecipient.findMany({
+    where: { emailId: { in: emailIds }, type: "TO" },
+    select: { emailId: true, userId: true },
+  });
+
+  const byEmail = new Map();
+  rows.forEach((r) => {
+    if (!byEmail.has(r.emailId)) byEmail.set(r.emailId, []);
+    byEmail.get(r.emailId).push(r.userId);
+  });
+  return byEmail;
+};
+
 const listByFolder = async (userId, folder, { search, label, sortBy = "createdAt", order = "desc", page = 1, limit = 25 }) => {
   const isVirtual = folder === "STARRED" || folder === "IMPORTANT";
 
@@ -243,6 +260,7 @@ module.exports = {
   createRecipientRow,
   upsertSenderRow,
   findRecipientRow,
+  getToRecipientsForEmails,
   listByFolder,
   countUnread,
   getThreadEmails,

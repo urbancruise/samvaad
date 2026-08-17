@@ -5,15 +5,6 @@ const { setEmitter, dispatchDueScheduledEmails } = require("./Email.service");
 
 let io = null;
 
-/**
- * Call this once from server.js, passing the raw http.Server instance
- * (not the Express app) — Socket.io needs to attach at that level.
- *
- *   const http = require("http");
- *   const httpServer = http.createServer(app);
- *   require("./module/email/email.socket").initEmailSocket(httpServer);
- *   httpServer.listen(PORT, ...);   // instead of app.listen(...)
- */
 const initEmailSocket = (httpServer) => {
   io = new Server(httpServer, {
     cors: {
@@ -22,8 +13,6 @@ const initEmailSocket = (httpServer) => {
     },
   });
 
-  // Auth handshake — same JWT your REST API already trusts, sent via
-  // either an auth token in the handshake or the accessToken cookie.
   io.use((socket, next) => {
     try {
       const token =
@@ -44,12 +33,9 @@ const initEmailSocket = (httpServer) => {
   });
 
   io.on("connection", (socket) => {
-    // Every user gets their own room — emitToUser below just targets
-    // this room instead of tracking individual socket ids.
     socket.join(`user:${socket.userId}`);
 
     socket.on("disconnect", () => {
-      // Nothing to clean up manually — rooms are per-connection.
     });
   });
 

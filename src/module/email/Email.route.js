@@ -36,12 +36,11 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 25 * 1024 * 1024 }, // 25MB per file
+  limits: { fileSize: 25 * 1024 * 1024 }, 
 });
 
 router.use(auth);
 
-// Recipient picker + labels + signature
 router.get("/recipients/search", searchRecipients);
 router.get("/labels", getLabels);
 router.post("/labels", createLabel);
@@ -49,26 +48,21 @@ router.delete("/labels/:labelId", deleteLabel);
 router.get("/signature", getSignature);
 router.put("/signature", upsertSignature);
 
-// Compose / draft
 router.post("/draft", createDraft);
 router.put("/draft/:emailId", autosaveDraft);
 router.post("/send", sendEmail);
 router.post("/:emailId/reply", replyToEmail);
 router.post("/:emailId/attachments", upload.single("file"), attachFile);
 
-// Folder listing + unread badge
 router.get("/unread-count", getUnreadCount);
 router.get("/folder/:folder", listFolder);
 
-// Thread / conversation view
 router.get("/thread/:threadId", getThread);
 
-// Per-email actions
 router.patch("/:emailId/flags", setFlag);
 router.patch("/:emailId/move", moveToFolder);
 router.delete("/:emailId", permanentDelete);
 
-// Bulk actions
 router.post("/bulk", bulkAction);
 
 module.exports = router;

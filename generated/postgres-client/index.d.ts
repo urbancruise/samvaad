@@ -3685,6 +3685,7 @@ export namespace Prisma {
     isRead: boolean | null
     createdAt: Date | null
     updatedAt: Date | null
+    link: string | null
   }
 
   export type NotificationMaxAggregateOutputType = {
@@ -3696,6 +3697,7 @@ export namespace Prisma {
     isRead: boolean | null
     createdAt: Date | null
     updatedAt: Date | null
+    link: string | null
   }
 
   export type NotificationCountAggregateOutputType = {
@@ -3707,6 +3709,7 @@ export namespace Prisma {
     isRead: number
     createdAt: number
     updatedAt: number
+    link: number
     _all: number
   }
 
@@ -3728,6 +3731,7 @@ export namespace Prisma {
     isRead?: true
     createdAt?: true
     updatedAt?: true
+    link?: true
   }
 
   export type NotificationMaxAggregateInputType = {
@@ -3739,6 +3743,7 @@ export namespace Prisma {
     isRead?: true
     createdAt?: true
     updatedAt?: true
+    link?: true
   }
 
   export type NotificationCountAggregateInputType = {
@@ -3750,6 +3755,7 @@ export namespace Prisma {
     isRead?: true
     createdAt?: true
     updatedAt?: true
+    link?: true
     _all?: true
   }
 
@@ -3848,6 +3854,7 @@ export namespace Prisma {
     isRead: boolean
     createdAt: Date
     updatedAt: Date
+    link: string | null
     _count: NotificationCountAggregateOutputType | null
     _avg: NotificationAvgAggregateOutputType | null
     _sum: NotificationSumAggregateOutputType | null
@@ -3878,6 +3885,7 @@ export namespace Prisma {
     isRead?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    link?: boolean
   }, ExtArgs["result"]["notification"]>
 
   export type NotificationSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -3889,6 +3897,7 @@ export namespace Prisma {
     isRead?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    link?: boolean
   }, ExtArgs["result"]["notification"]>
 
   export type NotificationSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
@@ -3900,6 +3909,7 @@ export namespace Prisma {
     isRead?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    link?: boolean
   }, ExtArgs["result"]["notification"]>
 
   export type NotificationSelectScalar = {
@@ -3911,9 +3921,10 @@ export namespace Prisma {
     isRead?: boolean
     createdAt?: boolean
     updatedAt?: boolean
+    link?: boolean
   }
 
-  export type NotificationOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "title" | "message" | "type" | "isRead" | "createdAt" | "updatedAt", ExtArgs["result"]["notification"]>
+  export type NotificationOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "userId" | "title" | "message" | "type" | "isRead" | "createdAt" | "updatedAt" | "link", ExtArgs["result"]["notification"]>
 
   export type $NotificationPayload<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     name: "Notification"
@@ -3927,6 +3938,7 @@ export namespace Prisma {
       isRead: boolean
       createdAt: Date
       updatedAt: Date
+      link: string | null
     }, ExtArgs["result"]["notification"]>
     composites: {}
   }
@@ -4358,6 +4370,7 @@ export namespace Prisma {
     readonly isRead: FieldRef<"Notification", 'Boolean'>
     readonly createdAt: FieldRef<"Notification", 'DateTime'>
     readonly updatedAt: FieldRef<"Notification", 'DateTime'>
+    readonly link: FieldRef<"Notification", 'String'>
   }
     
 
@@ -21069,7 +21082,8 @@ export namespace Prisma {
     type: 'type',
     isRead: 'isRead',
     createdAt: 'createdAt',
-    updatedAt: 'updatedAt'
+    updatedAt: 'updatedAt',
+    link: 'link'
   };
 
   export type NotificationScalarFieldEnum = (typeof NotificationScalarFieldEnum)[keyof typeof NotificationScalarFieldEnum]
@@ -21702,6 +21716,7 @@ export namespace Prisma {
     isRead?: BoolFilter<"Notification"> | boolean
     createdAt?: DateTimeFilter<"Notification"> | Date | string
     updatedAt?: DateTimeFilter<"Notification"> | Date | string
+    link?: StringNullableFilter<"Notification"> | string | null
   }
 
   export type NotificationOrderByWithRelationInput = {
@@ -21713,6 +21728,7 @@ export namespace Prisma {
     isRead?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    link?: SortOrderInput | SortOrder
   }
 
   export type NotificationWhereUniqueInput = Prisma.AtLeast<{
@@ -21727,6 +21743,7 @@ export namespace Prisma {
     isRead?: BoolFilter<"Notification"> | boolean
     createdAt?: DateTimeFilter<"Notification"> | Date | string
     updatedAt?: DateTimeFilter<"Notification"> | Date | string
+    link?: StringNullableFilter<"Notification"> | string | null
   }, "id">
 
   export type NotificationOrderByWithAggregationInput = {
@@ -21738,6 +21755,7 @@ export namespace Prisma {
     isRead?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    link?: SortOrderInput | SortOrder
     _count?: NotificationCountOrderByAggregateInput
     _avg?: NotificationAvgOrderByAggregateInput
     _max?: NotificationMaxOrderByAggregateInput
@@ -21757,6 +21775,7 @@ export namespace Prisma {
     isRead?: BoolWithAggregatesFilter<"Notification"> | boolean
     createdAt?: DateTimeWithAggregatesFilter<"Notification"> | Date | string
     updatedAt?: DateTimeWithAggregatesFilter<"Notification"> | Date | string
+    link?: StringNullableWithAggregatesFilter<"Notification"> | string | null
   }
 
   export type GoalWhereInput = {
@@ -23032,6 +23051,7 @@ export namespace Prisma {
     isRead?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
+    link?: string | null
   }
 
   export type NotificationUncheckedCreateInput = {
@@ -23043,6 +23063,7 @@ export namespace Prisma {
     isRead?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
+    link?: string | null
   }
 
   export type NotificationUpdateInput = {
@@ -23054,6 +23075,7 @@ export namespace Prisma {
     isRead?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    link?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type NotificationUncheckedUpdateInput = {
@@ -23065,6 +23087,7 @@ export namespace Prisma {
     isRead?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    link?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type NotificationCreateManyInput = {
@@ -23076,6 +23099,7 @@ export namespace Prisma {
     isRead?: boolean
     createdAt?: Date | string
     updatedAt?: Date | string
+    link?: string | null
   }
 
   export type NotificationUpdateManyMutationInput = {
@@ -23087,6 +23111,7 @@ export namespace Prisma {
     isRead?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    link?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type NotificationUncheckedUpdateManyInput = {
@@ -23098,6 +23123,7 @@ export namespace Prisma {
     isRead?: BoolFieldUpdateOperationsInput | boolean
     createdAt?: DateTimeFieldUpdateOperationsInput | Date | string
     updatedAt?: DateTimeFieldUpdateOperationsInput | Date | string
+    link?: NullableStringFieldUpdateOperationsInput | string | null
   }
 
   export type GoalCreateInput = {
@@ -24607,6 +24633,26 @@ export namespace Prisma {
     not?: NestedBoolFilter<$PrismaModel> | boolean
   }
 
+  export type StringNullableFilter<$PrismaModel = never> = {
+    equals?: string | StringFieldRefInput<$PrismaModel> | null
+    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
+    lt?: string | StringFieldRefInput<$PrismaModel>
+    lte?: string | StringFieldRefInput<$PrismaModel>
+    gt?: string | StringFieldRefInput<$PrismaModel>
+    gte?: string | StringFieldRefInput<$PrismaModel>
+    contains?: string | StringFieldRefInput<$PrismaModel>
+    startsWith?: string | StringFieldRefInput<$PrismaModel>
+    endsWith?: string | StringFieldRefInput<$PrismaModel>
+    mode?: QueryMode
+    not?: NestedStringNullableFilter<$PrismaModel> | string | null
+  }
+
+  export type SortOrderInput = {
+    sort: SortOrder
+    nulls?: NullsOrder
+  }
+
   export type NotificationCountOrderByAggregateInput = {
     id?: SortOrder
     userId?: SortOrder
@@ -24616,6 +24662,7 @@ export namespace Prisma {
     isRead?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    link?: SortOrder
   }
 
   export type NotificationAvgOrderByAggregateInput = {
@@ -24631,6 +24678,7 @@ export namespace Prisma {
     isRead?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    link?: SortOrder
   }
 
   export type NotificationMinOrderByAggregateInput = {
@@ -24642,6 +24690,7 @@ export namespace Prisma {
     isRead?: SortOrder
     createdAt?: SortOrder
     updatedAt?: SortOrder
+    link?: SortOrder
   }
 
   export type NotificationSumOrderByAggregateInput = {
@@ -24656,7 +24705,7 @@ export namespace Prisma {
     _max?: NestedBoolFilter<$PrismaModel>
   }
 
-  export type StringNullableFilter<$PrismaModel = never> = {
+  export type StringNullableWithAggregatesFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel> | null
     in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
     notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
@@ -24668,7 +24717,10 @@ export namespace Prisma {
     startsWith?: string | StringFieldRefInput<$PrismaModel>
     endsWith?: string | StringFieldRefInput<$PrismaModel>
     mode?: QueryMode
-    not?: NestedStringNullableFilter<$PrismaModel> | string | null
+    not?: NestedStringNullableWithAggregatesFilter<$PrismaModel> | string | null
+    _count?: NestedIntNullableFilter<$PrismaModel>
+    _min?: NestedStringNullableFilter<$PrismaModel>
+    _max?: NestedStringNullableFilter<$PrismaModel>
   }
 
   export type EnumGoalTypeFilter<$PrismaModel = never> = {
@@ -24696,11 +24748,6 @@ export namespace Prisma {
     every?: TaskWhereInput
     some?: TaskWhereInput
     none?: TaskWhereInput
-  }
-
-  export type SortOrderInput = {
-    sort: SortOrder
-    nulls?: NullsOrder
   }
 
   export type TaskOrderByRelationAggregateInput = {
@@ -24765,24 +24812,6 @@ export namespace Prisma {
     progress?: SortOrder
     createdById?: SortOrder
     assignedToId?: SortOrder
-  }
-
-  export type StringNullableWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: string | StringFieldRefInput<$PrismaModel> | null
-    in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
-    notIn?: string[] | ListStringFieldRefInput<$PrismaModel> | null
-    lt?: string | StringFieldRefInput<$PrismaModel>
-    lte?: string | StringFieldRefInput<$PrismaModel>
-    gt?: string | StringFieldRefInput<$PrismaModel>
-    gte?: string | StringFieldRefInput<$PrismaModel>
-    contains?: string | StringFieldRefInput<$PrismaModel>
-    startsWith?: string | StringFieldRefInput<$PrismaModel>
-    endsWith?: string | StringFieldRefInput<$PrismaModel>
-    mode?: QueryMode
-    not?: NestedStringNullableWithAggregatesFilter<$PrismaModel> | string | null
-    _count?: NestedIntNullableFilter<$PrismaModel>
-    _min?: NestedStringNullableFilter<$PrismaModel>
-    _max?: NestedStringNullableFilter<$PrismaModel>
   }
 
   export type EnumGoalTypeWithAggregatesFilter<$PrismaModel = never> = {
@@ -25968,6 +25997,10 @@ export namespace Prisma {
     set?: boolean
   }
 
+  export type NullableStringFieldUpdateOperationsInput = {
+    set?: string | null
+  }
+
   export type TaskCreateNestedManyWithoutGoalInput = {
     create?: XOR<TaskCreateWithoutGoalInput, TaskUncheckedCreateWithoutGoalInput> | TaskCreateWithoutGoalInput[] | TaskUncheckedCreateWithoutGoalInput[]
     connectOrCreate?: TaskCreateOrConnectWithoutGoalInput | TaskCreateOrConnectWithoutGoalInput[]
@@ -25980,10 +26013,6 @@ export namespace Prisma {
     connectOrCreate?: TaskCreateOrConnectWithoutGoalInput | TaskCreateOrConnectWithoutGoalInput[]
     createMany?: TaskCreateManyGoalInputEnvelope
     connect?: TaskWhereUniqueInput | TaskWhereUniqueInput[]
-  }
-
-  export type NullableStringFieldUpdateOperationsInput = {
-    set?: string | null
   }
 
   export type EnumGoalTypeFieldUpdateOperationsInput = {
@@ -26575,14 +26604,6 @@ export namespace Prisma {
     not?: NestedBoolFilter<$PrismaModel> | boolean
   }
 
-  export type NestedBoolWithAggregatesFilter<$PrismaModel = never> = {
-    equals?: boolean | BooleanFieldRefInput<$PrismaModel>
-    not?: NestedBoolWithAggregatesFilter<$PrismaModel> | boolean
-    _count?: NestedIntFilter<$PrismaModel>
-    _min?: NestedBoolFilter<$PrismaModel>
-    _max?: NestedBoolFilter<$PrismaModel>
-  }
-
   export type NestedStringNullableFilter<$PrismaModel = never> = {
     equals?: string | StringFieldRefInput<$PrismaModel> | null
     in?: string[] | ListStringFieldRefInput<$PrismaModel> | null
@@ -26597,25 +26618,12 @@ export namespace Prisma {
     not?: NestedStringNullableFilter<$PrismaModel> | string | null
   }
 
-  export type NestedEnumGoalTypeFilter<$PrismaModel = never> = {
-    equals?: $Enums.GoalType | EnumGoalTypeFieldRefInput<$PrismaModel>
-    in?: $Enums.GoalType[] | ListEnumGoalTypeFieldRefInput<$PrismaModel>
-    notIn?: $Enums.GoalType[] | ListEnumGoalTypeFieldRefInput<$PrismaModel>
-    not?: NestedEnumGoalTypeFilter<$PrismaModel> | $Enums.GoalType
-  }
-
-  export type NestedEnumPriorityFilter<$PrismaModel = never> = {
-    equals?: $Enums.Priority | EnumPriorityFieldRefInput<$PrismaModel>
-    in?: $Enums.Priority[] | ListEnumPriorityFieldRefInput<$PrismaModel>
-    notIn?: $Enums.Priority[] | ListEnumPriorityFieldRefInput<$PrismaModel>
-    not?: NestedEnumPriorityFilter<$PrismaModel> | $Enums.Priority
-  }
-
-  export type NestedEnumGoalStatusFilter<$PrismaModel = never> = {
-    equals?: $Enums.GoalStatus | EnumGoalStatusFieldRefInput<$PrismaModel>
-    in?: $Enums.GoalStatus[] | ListEnumGoalStatusFieldRefInput<$PrismaModel>
-    notIn?: $Enums.GoalStatus[] | ListEnumGoalStatusFieldRefInput<$PrismaModel>
-    not?: NestedEnumGoalStatusFilter<$PrismaModel> | $Enums.GoalStatus
+  export type NestedBoolWithAggregatesFilter<$PrismaModel = never> = {
+    equals?: boolean | BooleanFieldRefInput<$PrismaModel>
+    not?: NestedBoolWithAggregatesFilter<$PrismaModel> | boolean
+    _count?: NestedIntFilter<$PrismaModel>
+    _min?: NestedBoolFilter<$PrismaModel>
+    _max?: NestedBoolFilter<$PrismaModel>
   }
 
   export type NestedStringNullableWithAggregatesFilter<$PrismaModel = never> = {
@@ -26644,6 +26652,27 @@ export namespace Prisma {
     gt?: number | IntFieldRefInput<$PrismaModel>
     gte?: number | IntFieldRefInput<$PrismaModel>
     not?: NestedIntNullableFilter<$PrismaModel> | number | null
+  }
+
+  export type NestedEnumGoalTypeFilter<$PrismaModel = never> = {
+    equals?: $Enums.GoalType | EnumGoalTypeFieldRefInput<$PrismaModel>
+    in?: $Enums.GoalType[] | ListEnumGoalTypeFieldRefInput<$PrismaModel>
+    notIn?: $Enums.GoalType[] | ListEnumGoalTypeFieldRefInput<$PrismaModel>
+    not?: NestedEnumGoalTypeFilter<$PrismaModel> | $Enums.GoalType
+  }
+
+  export type NestedEnumPriorityFilter<$PrismaModel = never> = {
+    equals?: $Enums.Priority | EnumPriorityFieldRefInput<$PrismaModel>
+    in?: $Enums.Priority[] | ListEnumPriorityFieldRefInput<$PrismaModel>
+    notIn?: $Enums.Priority[] | ListEnumPriorityFieldRefInput<$PrismaModel>
+    not?: NestedEnumPriorityFilter<$PrismaModel> | $Enums.Priority
+  }
+
+  export type NestedEnumGoalStatusFilter<$PrismaModel = never> = {
+    equals?: $Enums.GoalStatus | EnumGoalStatusFieldRefInput<$PrismaModel>
+    in?: $Enums.GoalStatus[] | ListEnumGoalStatusFieldRefInput<$PrismaModel>
+    notIn?: $Enums.GoalStatus[] | ListEnumGoalStatusFieldRefInput<$PrismaModel>
+    not?: NestedEnumGoalStatusFilter<$PrismaModel> | $Enums.GoalStatus
   }
 
   export type NestedEnumGoalTypeWithAggregatesFilter<$PrismaModel = never> = {

@@ -138,7 +138,8 @@ exports.Prisma.NotificationScalarFieldEnum = {
   type: 'type',
   isRead: 'isRead',
   createdAt: 'createdAt',
-  updatedAt: 'updatedAt'
+  updatedAt: 'updatedAt',
+  link: 'link'
 };
 
 exports.Prisma.GoalScalarFieldEnum = {

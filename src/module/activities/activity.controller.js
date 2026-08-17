@@ -31,14 +31,6 @@ const createActivity = asyncHandler(async (req, res) => {
     throw new ApiError(400, error.message || "Validation failed");
   }
 
-  // const allowed = await canManageEmployee(req.user.id, req.body.assignedToId);
-
-  // if (!allowed) {
-  //   throw new ApiError(
-  //     403,
-  //     "You can assign activities only to yourself or your team."
-  //   );
-  // }
 
   const activity = await createActivityService({
     ...data,

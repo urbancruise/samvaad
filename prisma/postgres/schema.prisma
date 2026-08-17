@@ -104,10 +104,34 @@ model Notification {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+   link String?
 
   @@index([userId])
   @@index([userId, isRead])
 }
+
+// ============================================
+// Add to your Notification model in schema.prisma (Postgres), then:
+//   npx prisma migrate dev --name add-notification-link --schema=prisma/postgres/schema.prisma
+//
+// If your Notification model already has different field names,
+// adjust notification.service.js/repository.js below to match —
+// this assumes the shape used earlier in this conversation:
+// id, userId, title, message, type, isRead, createdAt.
+// ============================================
+
+// model Notification {
+  // ...your existing fields (id, userId, title, message, type, isRead, createdAt)...
+
+  // New: where clicking this notification should navigate. Stored as
+  // a role-agnostic relative path (e.g. "/email/thread/abc123") —
+  // the frontend prepends the current user's role prefix
+  // (/employee, /teamlead, etc.) at click time, same pattern used
+  // for Calendar event links and Task/Activity card links elsewhere
+  // in this app.
+ 
+// }
+
 
 model Goal {
   id String @id @default(cuid())
@@ -483,3 +507,4 @@ model EmailSignature {
   content String @db.Text
   isAutoAppend Boolean @default(true)
 }
+

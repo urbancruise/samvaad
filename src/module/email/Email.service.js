@@ -1,4 +1,5 @@
 const ApiError = require("../../utils/ApiError");
+const { sendEmailReceivedNotification } = require("../notifications/notification.service");
 
 const {
   hydrateUsers,
@@ -14,6 +15,7 @@ const {
   createRecipientRow,
   upsertSenderRow,
   findRecipientRow,
+  getToRecipientsForEmails,
   listByFolder,
   countUnread,
   getThreadEmails,
@@ -26,7 +28,7 @@ const {
   deleteLabel,
   getSignature,
   upsertSignature,
-} = require("./Email.repository");
+} = require("./email.repository");
 
 // Injected from email.socket.js at server startup — avoids a circular
 // require between the service and the socket layer. Falls back to a
@@ -147,10 +149,27 @@ const fileRecipients = async (emailId, fromId, { to, cc, bcc }, threadId, subjec
     ...bcc.map((userId) => ({ userId, type: "BCC" })),
   ];
 
+  if (allRecipients.length === 0) return;
+
+  // One lookup for the sender's display name, reused for every
+  // recipient's notification message below.
+  const fromMap = await hydrateUsers([fromId]);
+  const fromName = fromMap.get(fromId)?.fullName ?? null;
+
   for (const r of allRecipients) {
     if (r.userId === fromId) continue; // don't double-file into your own inbox
     await createRecipientRow({ emailId, userId: r.userId, type: r.type, folder: "INBOX", isRead: false });
+
+    // Live toast for anyone currently connected...
     emitToUser(r.userId, "email:new", { emailId, subject, threadId });
+
+    // ...and a persistent bell entry regardless of whether they were
+    // online when it arrived. Failure here shouldn't block the send.
+    try {
+      await sendEmailReceivedNotification({ userId: r.userId, fromName, subject, threadId });
+    } catch (err) {
+      console.error("Failed to create email notification:", err);
+    }
   }
 };
 
@@ -220,29 +239,53 @@ const listFolderService = async (userId, folder, query) => {
 
   const { rows, total } = await listByFolder(userId, folder, query);
 
+  // In Sent/Drafts/Scheduled, "From" is always the current user
+  // themself — useless to display. Real mail clients show "To: X"
+  // there instead, and only fall back to "From" for folders where
+  // you're the recipient (Inbox, Spam, Trash, Archive, Starred,
+  // Important — any of which could hold either direction).
+  const showRecipientInstead = ["SENT", "DRAFTS", "SCHEDULED"].includes(folder);
+
   const userIds = new Set();
-  rows.forEach((r) => {
-    userIds.add(r.email.fromId);
-  });
+  rows.forEach((r) => userIds.add(r.email.fromId));
+
+  const emailIds = rows.map((r) => r.email.id);
+  const toByEmail = showRecipientInstead ? await getToRecipientsForEmails(emailIds) : new Map();
+  toByEmail.forEach((ids) => ids.forEach((id) => userIds.add(id)));
+
   const userMap = await hydrateUsers([...userIds]);
 
-  const shaped = rows.map((r) => ({
-    id: r.email.id,
-    threadId: r.email.threadId,
-    recipientRowId: r.id,
-    subject: r.email.subject,
-    preview: (r.email.bodyText || "").slice(0, 140),
-    from: userMap.get(r.email.fromId) ?? null,
-    isRead: r.isRead,
-    isStarred: r.isStarred,
-    isImportant: r.isImportant,
-    labels: r.labels,
-    hasAttachments: r.email.attachments.length > 0,
-    attachmentCount: r.email.attachments.length,
-    scheduledAt: r.email.scheduledAt,
-    sentAt: r.email.sentAt,
-    createdAt: r.email.createdAt,
-  }));
+  const shaped = rows.map((r) => {
+    let displayParty = userMap.get(r.email.fromId) ?? null;
+    let displayPrefix = "";
+
+    if (showRecipientInstead) {
+      const toIds = toByEmail.get(r.email.id) ?? [];
+      const toUsers = toIds.map((id) => userMap.get(id)).filter(Boolean);
+      displayParty = toUsers[0] ?? null;
+      displayPrefix = toUsers.length > 1 ? ` +${toUsers.length - 1}` : "";
+    }
+
+    return {
+      id: r.email.id,
+      threadId: r.email.threadId,
+      recipientRowId: r.id,
+      subject: r.email.subject,
+      preview: (r.email.bodyText || "").slice(0, 140),
+      from: displayParty
+        ? { ...displayParty, fullName: `${displayPrefix ? "To: " : ""}${displayParty.fullName}${displayPrefix}` }
+        : null,
+      isRead: r.isRead,
+      isStarred: r.isStarred,
+      isImportant: r.isImportant,
+      labels: r.labels,
+      hasAttachments: r.email.attachments.length > 0,
+      attachmentCount: r.email.attachments.length,
+      scheduledAt: r.email.scheduledAt,
+      sentAt: r.email.sentAt,
+      createdAt: r.email.createdAt,
+    };
+  });
 
   return {
     emails: shaped,

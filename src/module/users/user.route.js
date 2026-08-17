@@ -16,7 +16,6 @@ const noCache = (req, res, next) => {
   next();
 };
 
-// router.post("/register", registerUser);
 
 router.post("/login", loginUser);
 
