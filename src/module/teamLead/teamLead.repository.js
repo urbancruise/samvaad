@@ -1,307 +1,240 @@
-const { mysqlDb, postgresDb } = require("../../../config/db");
+const { mysqlDb, postgresDb } = require("../../config/db");
 
-const getTeamMembers = async (teamLeadId) => {
+// Shared MySQL field mapping -> shape the rest of the app expects
+const mapEmployee = (u) => ({
+  id: u.id,
+  fullName: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim(),
+  email: u.officeEmail,
+  username: u.username,
+  role: u.access_role,
+  isActive: u.is_active,
+  // NOTE: lastLogin / createdAt kept from the original file's intent —
+  // verify these column names against the actual MySQL `users` schema
+  // (schema.prisma for mysql-client wasn't available when this was fixed).
+  lastLogin: u.lastLogin,
+  createdAt: u.createdAt,
+});
+
+const EMPLOYEE_SELECT = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  username: true,
+  officeEmail: true,
+  access_role: true,
+  is_active: true,
+  lastLogin: true,
+  createdAt: true,
+};
+
+/**
+ * All direct reports of managerId, basic profile fields only.
+ */
+const getTeamMembers = async (managerId) => {
   try {
-    // Step 1: hierarchy lookup — who reports to this team lead — lives in MySQL
     const employees = await mysqlDb.users.findMany({
-      where: { manager_id: teamLeadId },
-      select: {
-        id: true,
-        firstName: true,
-        lastName: true,
-        username: true,
-        officeEmail: true,
-        is_active: true,
-      },
+      where: { manager_id: managerId },
+      select: EMPLOYEE_SELECT,
+      orderBy: { firstName: "asc" },
+    });
+
+    return employees.map(mapEmployee);
+  } catch (error) {
+    console.error(`Error in getTeamMembers repository for manager ${managerId}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * A single direct report, scoped to managerId so a manager can't fetch
+ * someone else's report by guessing an id.
+ */
+const getTeamMemberById = async (managerId, employeeId) => {
+  try {
+    const employee = await mysqlDb.users.findFirst({
+      where: { id: Number(employeeId), manager_id: Number(managerId) },
+      select: EMPLOYEE_SELECT,
+    });
+
+    return employee ? mapEmployee(employee) : null;
+  } catch (error) {
+    console.error(`Error in getTeamMemberById repository for manager ${managerId} and employee ${employeeId}:`, error);
+    throw error;
+  }
+};
+
+/**
+ * MONTHLY performance rows for a set of employee ids, with basic
+ * profile info hydrated from MySQL (no Prisma relation crosses DBs).
+ */
+const getTeamPerformance = async (employeeIds) => {
+  try {
+    const [performances, users] = await Promise.all([
+      postgresDb.performance.findMany({
+        where: { userId: { in: employeeIds }, period: "MONTHLY" },
+        orderBy: { startDate: "desc" },
+      }),
+      mysqlDb.users.findMany({
+        where: { id: { in: employeeIds } },
+        select: { id: true, firstName: true, lastName: true, officeEmail: true },
+      }),
+    ]);
+
+    const userMap = Object.fromEntries(users.map((u) => [u.id, u]));
+
+    return performances.map((p) => {
+      const u = userMap[p.userId];
+      return {
+        ...p,
+        user: u
+          ? {
+              id: u.id,
+              fullName: `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim(),
+              email: u.officeEmail,
+            }
+          : null,
+      };
+    });
+  } catch (error) {
+    console.error("Error in getTeamPerformance repository for given employee IDs:", employeeIds, error);
+    throw error;
+  }
+};
+
+/**
+ * Open (non-completed) goals/tasks/activities per direct report.
+ */
+const getTeamWorkload = async (managerId) => {
+  try {
+    const employees = await mysqlDb.users.findMany({
+      where: { manager_id: managerId },
+      select: { id: true, firstName: true, lastName: true },
     });
 
     if (employees.length === 0) return [];
 
     const employeeIds = employees.map((e) => e.id);
-    const now = new Date();
 
-    const [goals, tasks, activities, performances] = await Promise.all([
+    const [goals, tasks, activities] = await Promise.all([
       postgresDb.goal.findMany({
-        where: { assignedToId: { in: employeeIds } },
-        select: { assignedToId: true, status: true },
+        where: { assignedToId: { in: employeeIds }, status: { not: "COMPLETED" } },
+        select: { id: true, assignedToId: true },
       }),
       postgresDb.task.findMany({
-        where: { assignedToId: { in: employeeIds } },
-        select: { assignedToId: true, status: true },
+        where: { assignedToId: { in: employeeIds }, status: { not: "COMPLETED" } },
+        select: { id: true, assignedToId: true },
       }),
       postgresDb.activity.findMany({
-        where: { assignedToId: { in: employeeIds } },
-        select: { assignedToId: true, status: true, dueDate: true },
-      }),
-      postgresDb.performance.findMany({
-        where: { userId: { in: employeeIds }, period: "MONTHLY" },
-        orderBy: { startDate: "desc" },
+        where: { assignedToId: { in: employeeIds }, status: { not: "COMPLETED" } },
+        select: { id: true, assignedToId: true, dueDate: true, priority: true },
       }),
     ]);
 
-    // Step 3: merge in JS, keyed by employee id
-    return employees.map((employee) => {
-      const empGoals = goals.filter((g) => g.assignedToId === employee.id);
-      const empTasks = tasks.filter((t) => t.assignedToId === employee.id);
-      const empActivities = activities.filter((a) => a.assignedToId === employee.id);
-      const performance = performances.find((p) => p.userId === employee.id);
-
-      const totalGoals = empGoals.length;
-      const completedGoals = empGoals.filter((g) => g.status === "COMPLETED").length;
-
-      const totalTasks = empTasks.length;
-      const completedTasks = empTasks.filter((t) => t.status === "COMPLETED").length;
-
-      const totalActivities = empActivities.length;
-      const completedActivities = empActivities.filter((a) => a.status === "COMPLETED").length;
-      const pendingActivities = empActivities.filter((a) => a.status !== "COMPLETED").length;
-
-      const overdueActivities = empActivities.filter(
-        (a) => a.status !== "COMPLETED" && a.dueDate && a.dueDate < now
-      ).length;
-
-      return {
-        id: employee.id,
-        fullName: `${employee.firstName ?? ""} ${employee.lastName ?? ""}`.trim(),
-        email: employee.officeEmail,
-        username: employee.username,
-        isActive: employee.is_active,
-        performanceScore: performance?.performanceScore ?? 0,
-        totalGoals,
-        completedGoals,
-        totalTasks,
-        completedTasks,
-        totalActivities,
-        completedActivities,
-        pendingActivities,
-        overdueActivities,
-      };
-    });
+    return employees.map((employee) => ({
+      id: employee.id,
+      fullName: `${employee.firstName ?? ""} ${employee.lastName ?? ""}`.trim(),
+      assignedGoals: goals.filter((g) => g.assignedToId === employee.id),
+      assignedTasks: tasks.filter((t) => t.assignedToId === employee.id),
+      assignedActivities: activities.filter((a) => a.assignedToId === employee.id),
+    }));
   } catch (error) {
-    console.error(`Error in getTeamMembers repository for team lead ${teamLeadId}:`, error);
+    console.error(`Error in getTeamWorkload repository for manager ${managerId}:`, error);
     throw error;
   }
 };
 
-// Shared helper: confirms employeeId actually reports to teamLeadId, via MySQL
-const findManagedEmployee = async (teamLeadId, employeeId) => {
-  return mysqlDb.users.findFirst({
-    where: { id: Number(employeeId), manager_id: Number(teamLeadId) },
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      username: true,
-      officeEmail: true,
-      access_role: true,
-      is_active: true,
-    },
-  });
-};
+/**
+ * Active direct reports, with open-item counts — used to power an
+ * "assign to" picker (e.g. show current load before assigning more).
+ */
+const getAssignableEmployees = async (managerId) => {
+  try {
+    const employees = await mysqlDb.users.findMany({
+      where: { manager_id: managerId, is_active: true },
+      select: { id: true, firstName: true, lastName: true, officeEmail: true },
+      orderBy: { firstName: "asc" },
+    });
 
-const getEmployeeProfile = async (teamLeadId, employeeId) => {
-  const employee = await findManagedEmployee(teamLeadId, employeeId);
-  if (!employee) return null;
+    if (employees.length === 0) return [];
 
-  const now = new Date();
-  const id = employee.id;
+    const employeeIds = employees.map((e) => e.id);
 
-  const [
-    totalGoals,
-    completedGoals,
-    totalTasks,
-    completedTasks,
-    totalActivities,
-    completedActivities,
-    pendingActivities,
-    overdueActivities,
-    performance,
-  ] = await Promise.all([
-    postgresDb.goal.count({ where: { assignedToId: id } }),
-    postgresDb.goal.count({ where: { assignedToId: id, status: "COMPLETED" } }),
-    postgresDb.task.count({ where: { assignedToId: id } }),
-    postgresDb.task.count({ where: { assignedToId: id, status: "COMPLETED" } }),
-    postgresDb.activity.count({ where: { assignedToId: id } }),
-    postgresDb.activity.count({ where: { assignedToId: id, status: "COMPLETED" } }),
-    postgresDb.activity.count({ where: { assignedToId: id, status: { not: "COMPLETED" } } }),
-    postgresDb.activity.count({
-      where: { assignedToId: id, status: { not: "COMPLETED" }, dueDate: { lt: now } },
-    }),
-    postgresDb.performance.findFirst({
-      where: { userId: id, period: "MONTHLY" },
-      orderBy: { startDate: "desc" },
-    }),
-  ]);
+    const [goals, tasks, activities] = await Promise.all([
+      postgresDb.goal.findMany({
+        where: { assignedToId: { in: employeeIds }, status: { not: "COMPLETED" } },
+        select: { id: true, assignedToId: true },
+      }),
+      postgresDb.task.findMany({
+        where: { assignedToId: { in: employeeIds }, status: { not: "COMPLETED" } },
+        select: { id: true, assignedToId: true },
+      }),
+      postgresDb.activity.findMany({
+        where: { assignedToId: { in: employeeIds }, status: { not: "COMPLETED" } },
+        select: { id: true, assignedToId: true },
+      }),
+    ]);
 
-  return {
-    profile: {
+    return employees.map((employee) => ({
       id: employee.id,
       fullName: `${employee.firstName ?? ""} ${employee.lastName ?? ""}`.trim(),
       email: employee.officeEmail,
-      username: employee.username,
-      role: employee.access_role,
-      isActive: employee.is_active,
-    },
-    overview: {
-      totalGoals,
-      completedGoals,
-      totalTasks,
-      completedTasks,
-      totalActivities,
-      completedActivities,
-      pendingActivities,
-      overdueActivities,
-    },
-    performance: {
-      performanceScore: performance?.performanceScore ?? 0,
-      completionRate: performance?.completionRate ?? 0,
-      productivityScore: performance?.productivityScore ?? 0,
-    },
-  };
+      assignedGoals: goals.filter((g) => g.assignedToId === employee.id),
+      assignedTasks: tasks.filter((t) => t.assignedToId === employee.id),
+      assignedActivities: activities.filter((a) => a.assignedToId === employee.id),
+    }));
+  } catch (error) {
+    console.error(`Error in getAssignableEmployees repository for manager ${managerId}:`, error);
+    throw error;
+  }
 };
 
 /**
- * NOTE: createdById/assignedToId are now included below. The frontend
- * uses these to decide whether the logged-in TL is allowed to see
- * Edit/Delete actions on a given goal — items created by the employee
- * themself (or by a different manager) should NOT show those actions.
+ * Direct reports with COMPLETED-item counts (contrast with getTeamWorkload,
+ * which is open items only).
  */
-const getEmployeeGoals = async (teamLeadId, employeeId) => {
-  const employee = await findManagedEmployee(teamLeadId, employeeId);
-  if (!employee) return null;
+const getMyTeam = async (teamLeadId) => {
+  try {
+    const employees = await mysqlDb.users.findMany({
+      where: { manager_id: teamLeadId },
+      select: EMPLOYEE_SELECT,
+    });
 
-  const goals = await postgresDb.goal.findMany({
-    where: { assignedToId: employee.id },
-    include: { tasks: { select: { status: true } } },
-    orderBy: { dueDate: "asc" },
-  });
+    if (employees.length === 0) return [];
 
-  return goals.map((goal) => ({
-    id: goal.id,
-    title: goal.title,
-    description: goal.description,
-    goalType: goal.goalType,
-    priority: goal.priority,
-    status: goal.status,
-    progress: goal.progress,
-    startDate: goal.startDate,
-    dueDate: goal.dueDate,
-    createdById: goal.createdById,
-    assignedToId: goal.assignedToId,
-    taskCount: goal.tasks.length,
-    completedTasks: goal.tasks.filter((t) => t.status === "COMPLETED").length,
-  }));
-};
+    const employeeIds = employees.map((e) => e.id);
 
-const getEmployeeTasks = async (teamLeadId, employeeId) => {
-  const employee = await findManagedEmployee(teamLeadId, employeeId);
-  if (!employee) return null;
+    const [goals, tasks, activities] = await Promise.all([
+      postgresDb.goal.findMany({
+        where: { assignedToId: { in: employeeIds }, status: "COMPLETED" },
+        select: { id: true, assignedToId: true },
+      }),
+      postgresDb.task.findMany({
+        where: { assignedToId: { in: employeeIds }, status: "COMPLETED" },
+        select: { id: true, assignedToId: true },
+      }),
+      postgresDb.activity.findMany({
+        where: { assignedToId: { in: employeeIds }, status: "COMPLETED" },
+        select: { id: true, assignedToId: true },
+      }),
+    ]);
 
-  const tasks = await postgresDb.task.findMany({
-    where: { assignedToId: employee.id },
-    include: {
-      goal: { select: { id: true, title: true } },
-      activities: { select: { status: true } },
-    },
-    orderBy: { dueDate: "asc" },
-  });
-
-  return tasks.map((task) => ({
-    id: task.id,
-    title: task.title,
-    description: task.description,
-    priority: task.priority,
-    status: task.status,
-    progress: task.progress,
-    startDate: task.startDate,
-    dueDate: task.dueDate,
-    estimatedHours: task.estimatedHours,
-    createdById: task.createdById,
-    assignedToId: task.assignedToId,
-    goal: task.goal,
-    activityCount: task.activities.length,
-    completedActivities: task.activities.filter((a) => a.status === "COMPLETED").length,
-  }));
-};
-
-const getEmployeeActivities = async (teamLeadId, employeeId) => {
-  const employee = await findManagedEmployee(teamLeadId, employeeId);
-  if (!employee) return null;
-
-  const activities = await postgresDb.activity.findMany({
-    where: { assignedToId: employee.id },
-    include: {
-      task: {
-        select: {
-          id: true,
-          title: true,
-          goal: { select: { id: true, title: true } },
-        },
-      },
-    },
-    orderBy: { dueDate: "asc" },
-  });
-
-  return activities.map((activity) => ({
-    id: activity.id,
-    title: activity.title,
-    description: activity.description,
-    priority: activity.priority,
-    status: activity.status,
-    progress: activity.progress,
-    estimatedMinutes: activity.estimatedMinutes,
-    actualMinutes: activity.actualMinutes,
-    startedAt: activity.startedAt,
-    completedAt: activity.completedAt,
-    dueDate: activity.dueDate,
-    createdById: activity.createdById,
-    assignedToId: activity.assignedToId,
-    task: activity.task,
-    goal: activity.task.goal,
-  }));
-};
-
-const getEmployeeTimeline = async (teamLeadId, employeeId) => {
-  const employee = await findManagedEmployee(teamLeadId, employeeId);
-  if (!employee) return null;
-
-  const history = await postgresDb.activityHistory.findMany({
-    where: { activity: { assignedToId: employee.id } },
-    include: {
-      activity: {
-        select: {
-          id: true,
-          title: true,
-          task: { select: { title: true, goal: { select: { title: true } } } },
-        },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  // userId on ActivityHistory is a MySQL id with no relation, so batch-hydrate names
-  const userIds = [...new Set(history.map((h) => h.userId))];
-  const users = userIds.length
-    ? await mysqlDb.users.findMany({
-        where: { id: { in: userIds } },
-        select: { id: true, firstName: true, lastName: true },
-      })
-    : [];
-  const userMap = Object.fromEntries(
-    users.map((u) => [u.id, `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim()])
-  );
-
-  return history.map((h) => ({
-    ...h,
-    user: { id: h.userId, fullName: userMap[h.userId] ?? "Unknown" },
-  }));
+    return employees.map((employee) => ({
+      ...mapEmployee(employee),
+      assignedGoals: goals.filter((g) => g.assignedToId === employee.id),
+      assignedTasks: tasks.filter((t) => t.assignedToId === employee.id),
+      assignedActivities: activities.filter((a) => a.assignedToId === employee.id),
+    }));
+  } catch (error) {
+    console.error(`Error in getMyTeam repository for team lead ${teamLeadId}:`, error);
+    throw error;
+  }
 };
 
 module.exports = {
   getTeamMembers,
-  getEmployeeProfile,
-  getEmployeeGoals,
-  getEmployeeTasks,
-  getEmployeeActivities,
-  getEmployeeTimeline,
+  getTeamMemberById,
+  getTeamPerformance,
+  getTeamWorkload,
+  getAssignableEmployees,
+  getMyTeam,
 };

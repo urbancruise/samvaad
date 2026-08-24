@@ -30,9 +30,6 @@ const {
   upsertSignature,
 } = require("./Email.repository");
 
-// Injected from email.socket.js at server startup — avoids a circular
-// require between the service and the socket layer. Falls back to a
-// no-op so the service still works fine if sockets aren't wired up.
 let emitToUser = () => {};
 const setEmitter = (fn) => {
   emitToUser = fn;
@@ -40,7 +37,6 @@ const setEmitter = (fn) => {
 
 const stripHtml = (html) => (html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
-// ---------- Compose / Draft ----------
 
 const createDraftService = async (fromId, data) => {
   const thread = await createThread(data.subject || "(no subject)");
@@ -63,10 +59,6 @@ const createDraftService = async (fromId, data) => {
   return { ...email, threadId: thread.id, to: data.to ?? [], cc: data.cc ?? [], bcc: data.bcc ?? [] };
 };
 
-/**
- * Auto-save — called frequently while composing. Cheap upsert, no
- * recipient resolution yet (that only happens on actual Send).
- */
 const autosaveDraftService = async (emailId, userId, data) => {
   const own = await findRecipientRow(emailId, userId);
   if (!own || own.type !== "SENDER") {
@@ -80,7 +72,7 @@ const autosaveDraftService = async (emailId, userId, data) => {
   });
 };
 
-// ---------- Send ----------
+
 
 const resolveRecipientList = (list) => (Array.isArray(list) ? list.map(Number).filter(Boolean) : []);
 
@@ -94,6 +86,14 @@ const sendEmailService = async (fromId, data) => {
   }
 
   let threadId = data.threadId;
+
+  // If we're sending an existing draft and no threadId was passed,
+  // recover the draft's own thread instead of minting a new one.
+  if (!threadId && data.emailId) {
+    const existingDraft = await findEmailById(data.emailId);
+    threadId = existingDraft?.threadId || null;
+  }
+
   if (!threadId) {
     const thread = await createThread(data.subject || "(no subject)");
     threadId = thread.id;
@@ -105,7 +105,7 @@ const sendEmailService = async (fromId, data) => {
 
   let email;
   if (data.emailId) {
-    // Sending an existing draft
+    // Update the existing draft row in place — don't create a duplicate.
     email = await updateEmailContent(data.emailId, {
       subject: data.subject || "",
       bodyHtml: data.bodyHtml || "",
@@ -118,13 +118,10 @@ const sendEmailService = async (fromId, data) => {
       subject: data.subject || "",
       bodyHtml: data.bodyHtml || "",
       bodyText: stripHtml(data.bodyHtml),
-      isDraft: isScheduled, // scheduled emails stay "not yet sent" until dispatch
+      isDraft: isScheduled,
       scheduledAt: isScheduled ? new Date(data.scheduledAt) : null,
       sentAt: isScheduled ? null : new Date(),
       inReplyToId: data.inReplyToId || null,
-      // Held here until dispatch time, since real EmailRecipient rows
-      // (which make the email visible to recipients) shouldn't exist
-      // until it's actually sent.
       pendingRecipients: isScheduled ? { to, cc, bcc } : null,
     });
   }
@@ -173,10 +170,7 @@ const fileRecipients = async (emailId, fromId, { to, cc, bcc }, threadId, subjec
   }
 };
 
-/**
- * Reply / Reply All / Forward all funnel through here — the only
- * difference is which recipient list gets computed.
- */
+
 const replyToEmailService = async (fromId, originalEmailId, { bodyHtml, replyAll, forwardTo }) => {
   const original = await findEmailById(originalEmailId);
   if (!original) throw new ApiError(404, "Original email not found.");
@@ -413,15 +407,7 @@ const deleteLabelService = (userId, labelId) => deleteLabel(userId, labelId);
 const getSignatureService = (userId) => getSignature(userId);
 const upsertSignatureService = (userId, content, isAutoAppend) => upsertSignature(userId, content, isAutoAppend ?? true);
 
-// ---------- Scheduled dispatcher ----------
 
-/**
- * Simple interval-based dispatcher — checks every 30s for scheduled
- * emails whose time has come and actually sends them, using the
- * pendingRecipients captured back at schedule time. For a small/
- * medium app this is fine; if volume grows, swap for a real job queue
- * (BullMQ + Redis) without changing anything else in this file.
- */
 const dispatchDueScheduledEmails = async () => {
   const due = await findDueScheduledEmails();
 

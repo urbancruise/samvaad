@@ -98,6 +98,12 @@ const getMyTasksService = async (userId, query) => {
   }
 };
 
+/**
+ * FIXED: previously only checked task.assignedToId, so the task's
+ * CREATOR (e.g. a TL who assigned the task to an employee) got a 403
+ * trying to view a task they themselves created. Now allows either
+ * the assignee or the creator to view it.
+ */
 const getTaskByIdService = async (taskId, userId) => {
   try {
     const task = await findTaskById(taskId);
@@ -105,7 +111,10 @@ const getTaskByIdService = async (taskId, userId) => {
       throw new ApiError(404, "Task not found");
     }
 
-    if (task.assignedToId !== userId) {
+    const isAssignee = Number(task.assignedToId) === Number(userId);
+    const isCreator = Number(task.createdById) === Number(userId);
+
+    if (!isAssignee && !isCreator) {
       throw new ApiError(403, "Access denied");
     }
 

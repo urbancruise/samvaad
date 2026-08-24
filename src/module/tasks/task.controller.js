@@ -21,9 +21,7 @@ const { canManageEmployee } = require("../teamLead/teamLead.permission");
 
 const createTask = asyncHandler(async (req, res) => {
   const data = createTaskSchema.parse(req.body);
-   console.log("this is gooooooooal",req.body);
   const targetUserId = data.assignedToId || req.user.id;
-  console.log(targetUserId)
 
   const allowed = await canManageEmployee(req.user.id, targetUserId, req.user.role);
   if (!allowed) {
@@ -60,7 +58,7 @@ const getTaskById = asyncHandler(async (req, res) => {
 
 const updateTask = asyncHandler(async (req, res) => {
   const data = updateTaskSchema.parse(req.body);
-  
+
   const allowed = await canManageTask(req.user, req.params.taskId);
   if (!allowed) {
     throw new ApiError(403, "You are not allowed to modify this task");

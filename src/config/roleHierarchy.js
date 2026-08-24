@@ -2,6 +2,7 @@
 
 const ROLES = {
   SUPER_ADMIN: "SUPER_ADMIN",
+  ADMIN: "ADMIN", // treated identically to SUPER_ADMIN — used as a role name in DashboardLayout's ROUTE_ROLES
   HOD: "HOD",
   ZONAL_HEAD: "ZONAL_HEAD", // treated identically to HOD
   MANAGER: "MANAGER",
@@ -12,6 +13,7 @@ const ROLES = {
 // lower number = higher authority
 const ROLE_LEVEL = {
   SUPER_ADMIN: 1,
+  ADMIN: 1, // same level as SUPER_ADMIN
   HOD: 2,
   ZONAL_HEAD: 2, // same level as HOD
   MANAGER: 3,
@@ -25,14 +27,17 @@ function canAssignTask(assignerRole, assigneeRole) {
   const assigneeLevel = ROLE_LEVEL[assigneeRole];
   if (assignerLevel === undefined || assigneeLevel === undefined) return false;
 
-  if (assignerRole === ROLES.SUPER_ADMIN) return true; // admin can assign to anyone
+  if (assignerRole === ROLES.SUPER_ADMIN || assignerRole === ROLES.ADMIN) return true; // admin can assign to anyone
 
   // everyone else can only assign one level down
   return assigneeLevel === assignerLevel + 1;
 }
 
 function isAtLeast(role, minRole) {
-  return ROLE_LEVEL[role] <= ROLE_LEVEL[minRole];
+  const roleLevel = ROLE_LEVEL[role];
+  const minLevel = ROLE_LEVEL[minRole];
+  if (roleLevel === undefined || minLevel === undefined) return false;
+  return roleLevel <= minLevel;
 }
 
 module.exports = { ROLES, ROLE_LEVEL, canAssignTask, isAtLeast };

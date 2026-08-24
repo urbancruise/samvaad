@@ -76,10 +76,7 @@ const sendActivityAssignedNotification = async ({ userId, activityTitle }) => {
   }
 };
 
-/**
- * New — used by the Email module so a new message shows up in the
- * persistent notification bell too, not just the real-time toast.
- */
+0
 const sendEmailReceivedNotification = async ({ userId, fromName, subject, threadId }) => {
   try {
     return await sendNotification({
