@@ -504,3 +504,199 @@ model EmailSignature {
   content      String  @db.Text
   isAutoAppend Boolean @default(true)
 }
+
+// ============================================
+// CHAT MODULE — append to prisma/postgres/schema.prisma, then:
+//   npx prisma migrate dev --name add-chat --schema=prisma/postgres/schema.prisma
+//
+// Follows the same cross-database convention as the rest of this schema:
+// userId / senderId / createdById fields are plain Int referencing
+// MySQL users.id — no Prisma relation, hydrate via mysqlDb separately.
+// ============================================
+
+enum ConversationType {
+  DIRECT
+  GROUP
+}
+
+enum ParticipantRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  AUDIO
+  VIDEO
+  SYSTEM
+  CALL_LOG
+}
+
+enum CallType {
+  AUDIO
+  VIDEO
+}
+
+enum CallStatus {
+  RINGING
+  ONGOING
+  ENDED
+  MISSED
+  DECLINED
+}
+
+enum CallParticipantStatus {
+  INVITED
+  RINGING
+  JOINED
+  DECLINED
+  LEFT
+  MISSED
+}
+
+model Conversation {
+  id   String           @id @default(cuid())
+  type ConversationType
+
+  // null for DIRECT conversations — name is derived client-side from
+  // the other participant. Required for GROUP (enforced in validation).
+  name      String?
+  avatarUrl String?
+
+  createdById Int // MySQL users.id
+
+  lastMessageAt DateTime @default(now())
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  participants ConversationParticipant[]
+  messages     Message[]
+  calls        Call[]
+
+  @@index([lastMessageAt])
+  @@index([type])
+}
+
+model ConversationParticipant {
+  id String @id @default(cuid())
+
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  userId Int // MySQL users.id
+  role   ParticipantRole @default(MEMBER)
+
+  isMuted Boolean @default(false)
+
+  lastReadMessageId String?
+  lastReadAt        DateTime?
+
+  joinedAt DateTime  @default(now())
+  leftAt   DateTime? // soft-remove from group; keeps message history intact
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@index([conversationId])
+}
+
+model Message {
+  id String @id @default(cuid())
+
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  senderId Int // MySQL users.id
+  type     MessageType @default(TEXT)
+
+  body String? @db.Text
+
+  replyToId String?
+  replyTo   Message?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies   Message[] @relation("MessageReplies")
+
+  mentions Int[] @default([]) // MySQL user ids tagged with @
+
+  isEdited Boolean   @default(false)
+  editedAt DateTime?
+
+  deletedAt DateTime? // soft delete ("this message was deleted")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  attachments MessageAttachment[]
+  reactions   MessageReaction[]
+
+  @@index([conversationId, createdAt])
+  @@index([senderId])
+  @@index([replyToId])
+}
+
+model MessageAttachment {
+  id        String  @id @default(cuid())
+  messageId String
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  fileName     String
+  fileUrl      String
+  fileSize     Int
+  mimeType     String
+  thumbnailUrl String?
+
+  createdAt DateTime @default(now())
+
+  @@index([messageId])
+}
+
+model MessageReaction {
+  id        String  @id @default(cuid())
+  messageId String
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  userId Int // MySQL users.id
+  emoji  String
+
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId, emoji])
+  @@index([messageId])
+}
+
+model Call {
+  id String @id @default(cuid())
+
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  type   CallType
+  status CallStatus @default(RINGING)
+
+  startedById Int // MySQL users.id
+
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  participants CallParticipant[]
+
+  @@index([conversationId])
+  @@index([status])
+}
+
+model CallParticipant {
+  id     String @id @default(cuid())
+  callId String
+  call   Call   @relation(fields: [callId], references: [id], onDelete: Cascade)
+
+  userId Int // MySQL users.id
+  status CallParticipantStatus @default(INVITED)
+
+  joinedAt DateTime?
+  leftAt   DateTime?
+
+  @@unique([callId, userId])
+  @@index([userId])
+}

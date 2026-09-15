@@ -2,8 +2,15 @@ require("dotenv").config();
 const http = require("http");
 const app = require("./app");
 const { connectDB } = require("./config/db");
+const { createSocketServer } = require("./socket");
+
 const httpServer = http.createServer(app);
-require("./module/email/Email.socket").initEmailSocket(httpServer);
+
+// Single Socket.io instance for the whole app — chat, calls, and
+// email realtime all register their handlers onto this one server
+// inside createSocketServer() (see src/socket/index.js).
+createSocketServer(httpServer);
+
 const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {

@@ -334,6 +334,82 @@ exports.Prisma.EmailSignatureScalarFieldEnum = {
   isAutoAppend: 'isAutoAppend'
 };
 
+exports.Prisma.ConversationScalarFieldEnum = {
+  id: 'id',
+  type: 'type',
+  name: 'name',
+  avatarUrl: 'avatarUrl',
+  createdById: 'createdById',
+  lastMessageAt: 'lastMessageAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.ConversationParticipantScalarFieldEnum = {
+  id: 'id',
+  conversationId: 'conversationId',
+  userId: 'userId',
+  role: 'role',
+  isMuted: 'isMuted',
+  lastReadMessageId: 'lastReadMessageId',
+  lastReadAt: 'lastReadAt',
+  joinedAt: 'joinedAt',
+  leftAt: 'leftAt'
+};
+
+exports.Prisma.MessageScalarFieldEnum = {
+  id: 'id',
+  conversationId: 'conversationId',
+  senderId: 'senderId',
+  type: 'type',
+  body: 'body',
+  replyToId: 'replyToId',
+  mentions: 'mentions',
+  isEdited: 'isEdited',
+  editedAt: 'editedAt',
+  deletedAt: 'deletedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+};
+
+exports.Prisma.MessageAttachmentScalarFieldEnum = {
+  id: 'id',
+  messageId: 'messageId',
+  fileName: 'fileName',
+  fileUrl: 'fileUrl',
+  fileSize: 'fileSize',
+  mimeType: 'mimeType',
+  thumbnailUrl: 'thumbnailUrl',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.MessageReactionScalarFieldEnum = {
+  id: 'id',
+  messageId: 'messageId',
+  userId: 'userId',
+  emoji: 'emoji',
+  createdAt: 'createdAt'
+};
+
+exports.Prisma.CallScalarFieldEnum = {
+  id: 'id',
+  conversationId: 'conversationId',
+  type: 'type',
+  status: 'status',
+  startedById: 'startedById',
+  startedAt: 'startedAt',
+  endedAt: 'endedAt'
+};
+
+exports.Prisma.CallParticipantScalarFieldEnum = {
+  id: 'id',
+  callId: 'callId',
+  userId: 'userId',
+  status: 'status',
+  joinedAt: 'joinedAt',
+  leftAt: 'leftAt'
+};
+
 exports.Prisma.SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -453,6 +529,49 @@ exports.EmailFolder = exports.$Enums.EmailFolder = {
   ARCHIVE: 'ARCHIVE'
 };
 
+exports.ConversationType = exports.$Enums.ConversationType = {
+  DIRECT: 'DIRECT',
+  GROUP: 'GROUP'
+};
+
+exports.ParticipantRole = exports.$Enums.ParticipantRole = {
+  OWNER: 'OWNER',
+  ADMIN: 'ADMIN',
+  MEMBER: 'MEMBER'
+};
+
+exports.MessageType = exports.$Enums.MessageType = {
+  TEXT: 'TEXT',
+  IMAGE: 'IMAGE',
+  FILE: 'FILE',
+  AUDIO: 'AUDIO',
+  VIDEO: 'VIDEO',
+  SYSTEM: 'SYSTEM',
+  CALL_LOG: 'CALL_LOG'
+};
+
+exports.CallType = exports.$Enums.CallType = {
+  AUDIO: 'AUDIO',
+  VIDEO: 'VIDEO'
+};
+
+exports.CallStatus = exports.$Enums.CallStatus = {
+  RINGING: 'RINGING',
+  ONGOING: 'ONGOING',
+  ENDED: 'ENDED',
+  MISSED: 'MISSED',
+  DECLINED: 'DECLINED'
+};
+
+exports.CallParticipantStatus = exports.$Enums.CallParticipantStatus = {
+  INVITED: 'INVITED',
+  RINGING: 'RINGING',
+  JOINED: 'JOINED',
+  DECLINED: 'DECLINED',
+  LEFT: 'LEFT',
+  MISSED: 'MISSED'
+};
+
 exports.Prisma.ModelName = {
   RoleLevelMap: 'RoleLevelMap',
   Notification: 'Notification',
@@ -469,7 +588,14 @@ exports.Prisma.ModelName = {
   EmailRecipient: 'EmailRecipient',
   EmailAttachment: 'EmailAttachment',
   EmailLabel: 'EmailLabel',
-  EmailSignature: 'EmailSignature'
+  EmailSignature: 'EmailSignature',
+  Conversation: 'Conversation',
+  ConversationParticipant: 'ConversationParticipant',
+  Message: 'Message',
+  MessageAttachment: 'MessageAttachment',
+  MessageReaction: 'MessageReaction',
+  Call: 'Call',
+  CallParticipant: 'CallParticipant'
 };
 
 /**
