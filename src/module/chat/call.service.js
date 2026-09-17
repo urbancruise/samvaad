@@ -13,11 +13,6 @@ const formatDuration = (ms) => {
   return `${minutes}m ${seconds}s`;
 };
 
-/**
- * Starts a call for every current participant of the conversation
- * (minus the caller). Throws if the conversation already has an
- * active call — join that one instead (see joinCallService).
- */
 const initiateCallService = async (conversationId, callerId, type) => {
   const conversation = await chatService.assertParticipant(conversationId, callerId)
     .then(() => chatRepo.findConversationById(conversationId));
@@ -25,11 +20,46 @@ const initiateCallService = async (conversationId, callerId, type) => {
   if (!conversation) throw new ApiError(404, "Conversation not found");
 
   const existing = await callRepo.findActiveCallForConversation(conversationId);
+
   if (existing) {
-    // NOTE: if ApiError supports a 3rd "extra data" argument in your
-    // codebase, pass { callId: existing.id } here so the frontend can
-    // offer "join the existing call" instead of just an error toast —
-    // adjust once you confirm ApiError's signature.
+    const isExistingParticipant = existing.participants.some((p) => p.userId === callerId);
+
+    /**
+     * FIX: previously this always threw 409, even when the "active
+     * call" was stuck because of a dropped connection / crashed tab
+     * and the requester is one of its rightful participants. That
+     * left conversations permanently unable to start a new call until
+     * someone manually cleared the DB row — and the frontend had no
+     * way to recover, it just errored silently (uncaught rejection).
+     *
+     * If the caller is already a participant of the stuck/active
+     * call, treat this exactly like rejoining it (same mechanics as
+     * acceptCallService) instead of failing.
+     */
+    if (isExistingParticipant) {
+      await callRepo.updateParticipantStatus(existing.id, callerId, CALL_PARTICIPANT_STATUS.JOINED, {
+        joinedAt: new Date(),
+      });
+
+      if (existing.status === CALL_STATUS.RINGING) {
+        await callRepo.updateCallStatus(existing.id, CALL_STATUS.ONGOING);
+      }
+
+      const refreshed = await callRepo.findCallById(existing.id);
+      const userMap = await chatService.hydrateUsers(refreshed.participants.map((p) => p.userId));
+
+      return {
+        id: refreshed.id,
+        conversationId,
+        type: refreshed.type,
+        status: refreshed.status,
+        startedBy: userMap[refreshed.startedById],
+        participants: refreshed.participants.map((p) => ({ ...userMap[p.userId], status: p.status })),
+        startedAt: refreshed.startedAt,
+        rejoined: true, // lets the frontend know this wasn't a fresh call
+      };
+    }
+
     throw new ApiError(409, `This conversation already has an active call (${existing.id})`);
   }
 
@@ -79,8 +109,6 @@ const acceptCallService = async (callId, userId) => {
     await callRepo.updateCallStatus(callId, CALL_STATUS.ONGOING);
   }
 
-  // Everyone already in the call before this join — the frontend uses
-  // this list to know who it should originate a WebRTC offer to.
   const alreadyJoined = call.participants.filter(
     (p) => p.status === CALL_PARTICIPANT_STATUS.JOINED && p.userId !== userId
   );
@@ -110,10 +138,6 @@ const declineCallService = async (callId, userId) => {
   return { callId, conversationId: call.conversationId };
 };
 
-/**
- * A participant leaving. If they were the last one in the room, the
- * call is ended and a CALL_LOG message is posted to the chat.
- */
 const leaveCallService = async (callId, userId) => {
   const { call } = await assertCallParticipant(callId, userId);
 
@@ -138,11 +162,31 @@ const endCallInternal = async (call, finalStatus) => {
   await callRepo.closeAnyOpenJoins(call.id);
   await callRepo.updateCallStatus(call.id, finalStatus, { endedAt: new Date() });
 
-  const joinedCount = call.participants.filter((p) => p.status === CALL_PARTICIPANT_STATUS.JOINED).length;
+  /**
+   * FIX: this used to count participants whose CURRENT status is
+   * JOINED — but by the time endCallInternal runs, everyone who was
+   * on the call has already been transitioned to LEFT (that's what
+   * triggers ending the call). That count is therefore always 0,
+   * which meant EVERY completed call — no matter how long — was
+   * logged as "Missed call" instead of showing its real duration.
+   *
+   * Use `joinedAt` instead: it's set once when a participant actually
+   * joins and is never cleared when they later leave, so it reliably
+   * answers "did this person actually connect at some point?" rather
+   * than "are they currently connected?".
+   *
+   * NOTE: this assumes `joinedAt` persists after a participant leaves
+   * (i.e. it's a separate historical field from `status`, matching
+   * how `leftAt` is tracked alongside status elsewhere in this file).
+   * If your schema clears `joinedAt` on leave, this needs a small
+   * adjustment — worth a quick check against call.repository.js /
+   * the Prisma schema for the CallParticipant model.
+   */
+  const everJoinedCount = call.participants.filter((p) => p.joinedAt).length;
   const durationMs = new Date() - new Date(call.startedAt);
 
   let logBody;
-  if (finalStatus === CALL_STATUS.DECLINED || joinedCount <= 1) {
+  if (finalStatus === CALL_STATUS.DECLINED || everJoinedCount <= 1) {
     logBody = `Missed ${call.type.toLowerCase()} call`;
   } else {
     logBody = `${call.type === "VIDEO" ? "Video" : "Audio"} call · ${formatDuration(durationMs)}`;
@@ -168,6 +212,24 @@ const getCallHistoryService = async (userId, { page = 1, limit = 30 } = {}) => {
   }));
 };
 
+const sweepStaleCallsService = async (maxAgeMs = 4 * 60 * 60 * 1000) => {
+  const staleCalls = await callRepo.findStaleActiveCalls(maxAgeMs);
+
+  const results = [];
+  for (const call of staleCalls) {
+    try {
+      await endCallInternal(call, CALL_STATUS.ENDED);
+      results.push({ callId: call.id, conversationId: call.conversationId, ok: true });
+    } catch (err) {
+      // One bad row shouldn't block the rest of the sweep.
+      console.error(`Failed to sweep stale call ${call.id}:`, err.message);
+      results.push({ callId: call.id, ok: false, error: err.message });
+    }
+  }
+
+  return results;
+};
+
 module.exports = {
   initiateCallService,
   assertCallParticipant,
@@ -175,4 +237,5 @@ module.exports = {
   declineCallService,
   leaveCallService,
   getCallHistoryService,
+  sweepStaleCallsService
 };

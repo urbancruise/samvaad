@@ -3,6 +3,7 @@ const http = require("http");
 const app = require("./app");
 const { connectDB } = require("./config/db");
 const { createSocketServer } = require("./socket");
+const { startStaleCallSweep } = require("./module/chat/call.cleanup");
 
 const httpServer = http.createServer(app);
 
@@ -10,6 +11,7 @@ const httpServer = http.createServer(app);
 // email realtime all register their handlers onto this one server
 // inside createSocketServer() (see src/socket/index.js).
 createSocketServer(httpServer);
+startStaleCallSweep();
 
 const PORT = process.env.PORT || 5000;
 

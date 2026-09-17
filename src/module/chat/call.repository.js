@@ -36,6 +36,24 @@ const findActiveCallForConversation = async (conversationId) => {
   });
 };
 
+/**
+ * Calls stuck in RINGING/ONGOING with no corresponding `call:leave` or
+ * disconnect ever recorded — crashed tab, force-quit, or a disconnect
+ * event that never reached the server. Used by the periodic sweep
+ * (call.cleanup.js) to force-end them so the conversation isn't
+ * permanently blocked from starting a new call.
+ */
+const findStaleActiveCalls = async (maxAgeMs) => {
+  const cutoff = new Date(Date.now() - maxAgeMs);
+  return postgresDb.call.findMany({
+    where: {
+      status: { in: [CALL_STATUS.RINGING, CALL_STATUS.ONGOING] },
+      startedAt: { lt: cutoff },
+    },
+    include: { participants: true },
+  });
+};
+
 const updateCallStatus = async (callId, status, extra = {}) => {
   return postgresDb.call.update({
     where: { id: callId },
@@ -81,6 +99,7 @@ module.exports = {
   createCall,
   findCallById,
   findActiveCallForConversation,
+  findStaleActiveCalls,
   updateCallStatus,
   updateParticipantStatus,
   markRemainingParticipantsMissed,
