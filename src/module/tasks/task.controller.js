@@ -65,7 +65,6 @@ const updateTask = asyncHandler(async (req, res) => {
   }
 
   const task = await updateTaskService(req.params.taskId, req.user.id, data, req.user.role);
-
   return res.status(200).json(
     new ApiResponse(200, task, "Task updated successfully")
   );

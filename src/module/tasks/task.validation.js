@@ -29,6 +29,11 @@ const createTaskSchema = z.object({
     .number()
     .optional(),
 
+  estimatedHours: z
+    .number()
+    .nonnegative()
+    .optional(),
+
   startDate: z
     .string()
     .optional()

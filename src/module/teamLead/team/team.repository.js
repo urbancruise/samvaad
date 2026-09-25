@@ -174,6 +174,7 @@ const getEmployeeGoals = async (teamLeadId, employeeId) => {
   return goals.map((goal) => ({
     id: goal.id,
     title: goal.title,
+    description: goal.description,   // ← same fix needed here
     goalType: goal.goalType,
     priority: goal.priority,
     status: goal.status,
@@ -182,10 +183,9 @@ const getEmployeeGoals = async (teamLeadId, employeeId) => {
     dueDate: goal.dueDate,
     createdById: goal.createdById,
     assignedToId: goal.assignedToId,
-
     taskCount: goal.tasks.length,
     completedTasks: goal.tasks.filter((t) => t.status === "COMPLETED").length,
-  }));
+}));
 };
 
 const getEmployeeTasks = async (teamLeadId, employeeId) => {
@@ -204,6 +204,7 @@ const getEmployeeTasks = async (teamLeadId, employeeId) => {
   return tasks.map((task) => ({
     id: task.id,
     title: task.title,
+    description: task.description,   // ← added
     priority: task.priority,
     status: task.status,
     progress: task.progress,
@@ -215,7 +216,7 @@ const getEmployeeTasks = async (teamLeadId, employeeId) => {
     goal: task.goal,
     activityCount: task.activities.length,
     completedActivities: task.activities.filter((a) => a.status === "COMPLETED").length,
-  }));
+}));
 };
 
 const getEmployeeActivities = async (teamLeadId, employeeId) => {
