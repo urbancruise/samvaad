@@ -8354,7 +8354,7 @@ export namespace Prisma {
     startedAt: Date | null
     completedAt: Date | null
     estimatedMinutes: number | null
-    actualMinutes: number
+    actualMinutes: number | null
     pausedAt: Date | null
     resumedAt: Date | null
     totalPauseMinutes: number
@@ -8512,7 +8512,7 @@ export namespace Prisma {
       startedAt: Date | null
       completedAt: Date | null
       estimatedMinutes: number | null
-      actualMinutes: number
+      actualMinutes: number | null
       pausedAt: Date | null
       resumedAt: Date | null
       totalPauseMinutes: number
@@ -31146,7 +31146,7 @@ export namespace Prisma {
     startedAt?: DateTimeNullableFilter<"Activity"> | Date | string | null
     completedAt?: DateTimeNullableFilter<"Activity"> | Date | string | null
     estimatedMinutes?: IntNullableFilter<"Activity"> | number | null
-    actualMinutes?: IntFilter<"Activity"> | number
+    actualMinutes?: IntNullableFilter<"Activity"> | number | null
     pausedAt?: DateTimeNullableFilter<"Activity"> | Date | string | null
     resumedAt?: DateTimeNullableFilter<"Activity"> | Date | string | null
     totalPauseMinutes?: IntFilter<"Activity"> | number
@@ -31171,7 +31171,7 @@ export namespace Prisma {
     startedAt?: SortOrderInput | SortOrder
     completedAt?: SortOrderInput | SortOrder
     estimatedMinutes?: SortOrderInput | SortOrder
-    actualMinutes?: SortOrder
+    actualMinutes?: SortOrderInput | SortOrder
     pausedAt?: SortOrderInput | SortOrder
     resumedAt?: SortOrderInput | SortOrder
     totalPauseMinutes?: SortOrder
@@ -31199,7 +31199,7 @@ export namespace Prisma {
     startedAt?: DateTimeNullableFilter<"Activity"> | Date | string | null
     completedAt?: DateTimeNullableFilter<"Activity"> | Date | string | null
     estimatedMinutes?: IntNullableFilter<"Activity"> | number | null
-    actualMinutes?: IntFilter<"Activity"> | number
+    actualMinutes?: IntNullableFilter<"Activity"> | number | null
     pausedAt?: DateTimeNullableFilter<"Activity"> | Date | string | null
     resumedAt?: DateTimeNullableFilter<"Activity"> | Date | string | null
     totalPauseMinutes?: IntFilter<"Activity"> | number
@@ -31224,7 +31224,7 @@ export namespace Prisma {
     startedAt?: SortOrderInput | SortOrder
     completedAt?: SortOrderInput | SortOrder
     estimatedMinutes?: SortOrderInput | SortOrder
-    actualMinutes?: SortOrder
+    actualMinutes?: SortOrderInput | SortOrder
     pausedAt?: SortOrderInput | SortOrder
     resumedAt?: SortOrderInput | SortOrder
     totalPauseMinutes?: SortOrder
@@ -31255,7 +31255,7 @@ export namespace Prisma {
     startedAt?: DateTimeNullableWithAggregatesFilter<"Activity"> | Date | string | null
     completedAt?: DateTimeNullableWithAggregatesFilter<"Activity"> | Date | string | null
     estimatedMinutes?: IntNullableWithAggregatesFilter<"Activity"> | number | null
-    actualMinutes?: IntWithAggregatesFilter<"Activity"> | number
+    actualMinutes?: IntNullableWithAggregatesFilter<"Activity"> | number | null
     pausedAt?: DateTimeNullableWithAggregatesFilter<"Activity"> | Date | string | null
     resumedAt?: DateTimeNullableWithAggregatesFilter<"Activity"> | Date | string | null
     totalPauseMinutes?: IntWithAggregatesFilter<"Activity"> | number
@@ -33051,7 +33051,7 @@ export namespace Prisma {
     startedAt?: Date | string | null
     completedAt?: Date | string | null
     estimatedMinutes?: number | null
-    actualMinutes?: number
+    actualMinutes?: number | null
     pausedAt?: Date | string | null
     resumedAt?: Date | string | null
     totalPauseMinutes?: number
@@ -33076,7 +33076,7 @@ export namespace Prisma {
     startedAt?: Date | string | null
     completedAt?: Date | string | null
     estimatedMinutes?: number | null
-    actualMinutes?: number
+    actualMinutes?: number | null
     pausedAt?: Date | string | null
     resumedAt?: Date | string | null
     totalPauseMinutes?: number
@@ -33099,7 +33099,7 @@ export namespace Prisma {
     startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     estimatedMinutes?: NullableIntFieldUpdateOperationsInput | number | null
-    actualMinutes?: IntFieldUpdateOperationsInput | number
+    actualMinutes?: NullableIntFieldUpdateOperationsInput | number | null
     pausedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     resumedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     totalPauseMinutes?: IntFieldUpdateOperationsInput | number
@@ -33124,7 +33124,7 @@ export namespace Prisma {
     startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     estimatedMinutes?: NullableIntFieldUpdateOperationsInput | number | null
-    actualMinutes?: IntFieldUpdateOperationsInput | number
+    actualMinutes?: NullableIntFieldUpdateOperationsInput | number | null
     pausedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     resumedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     totalPauseMinutes?: IntFieldUpdateOperationsInput | number
@@ -33148,7 +33148,7 @@ export namespace Prisma {
     startedAt?: Date | string | null
     completedAt?: Date | string | null
     estimatedMinutes?: number | null
-    actualMinutes?: number
+    actualMinutes?: number | null
     pausedAt?: Date | string | null
     resumedAt?: Date | string | null
     totalPauseMinutes?: number
@@ -33170,7 +33170,7 @@ export namespace Prisma {
     startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     estimatedMinutes?: NullableIntFieldUpdateOperationsInput | number | null
-    actualMinutes?: IntFieldUpdateOperationsInput | number
+    actualMinutes?: NullableIntFieldUpdateOperationsInput | number | null
     pausedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     resumedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     totalPauseMinutes?: IntFieldUpdateOperationsInput | number
@@ -33193,7 +33193,7 @@ export namespace Prisma {
     startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     estimatedMinutes?: NullableIntFieldUpdateOperationsInput | number | null
-    actualMinutes?: IntFieldUpdateOperationsInput | number
+    actualMinutes?: NullableIntFieldUpdateOperationsInput | number | null
     pausedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     resumedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     totalPauseMinutes?: IntFieldUpdateOperationsInput | number
@@ -38364,7 +38364,7 @@ export namespace Prisma {
     startedAt?: Date | string | null
     completedAt?: Date | string | null
     estimatedMinutes?: number | null
-    actualMinutes?: number
+    actualMinutes?: number | null
     pausedAt?: Date | string | null
     resumedAt?: Date | string | null
     totalPauseMinutes?: number
@@ -38387,7 +38387,7 @@ export namespace Prisma {
     startedAt?: Date | string | null
     completedAt?: Date | string | null
     estimatedMinutes?: number | null
-    actualMinutes?: number
+    actualMinutes?: number | null
     pausedAt?: Date | string | null
     resumedAt?: Date | string | null
     totalPauseMinutes?: number
@@ -38483,7 +38483,7 @@ export namespace Prisma {
     startedAt?: DateTimeNullableFilter<"Activity"> | Date | string | null
     completedAt?: DateTimeNullableFilter<"Activity"> | Date | string | null
     estimatedMinutes?: IntNullableFilter<"Activity"> | number | null
-    actualMinutes?: IntFilter<"Activity"> | number
+    actualMinutes?: IntNullableFilter<"Activity"> | number | null
     pausedAt?: DateTimeNullableFilter<"Activity"> | Date | string | null
     resumedAt?: DateTimeNullableFilter<"Activity"> | Date | string | null
     totalPauseMinutes?: IntFilter<"Activity"> | number
@@ -38653,7 +38653,7 @@ export namespace Prisma {
     startedAt?: Date | string | null
     completedAt?: Date | string | null
     estimatedMinutes?: number | null
-    actualMinutes?: number
+    actualMinutes?: number | null
     pausedAt?: Date | string | null
     resumedAt?: Date | string | null
     totalPauseMinutes?: number
@@ -38677,7 +38677,7 @@ export namespace Prisma {
     startedAt?: Date | string | null
     completedAt?: Date | string | null
     estimatedMinutes?: number | null
-    actualMinutes?: number
+    actualMinutes?: number | null
     pausedAt?: Date | string | null
     resumedAt?: Date | string | null
     totalPauseMinutes?: number
@@ -38715,7 +38715,7 @@ export namespace Prisma {
     startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     estimatedMinutes?: NullableIntFieldUpdateOperationsInput | number | null
-    actualMinutes?: IntFieldUpdateOperationsInput | number
+    actualMinutes?: NullableIntFieldUpdateOperationsInput | number | null
     pausedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     resumedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     totalPauseMinutes?: IntFieldUpdateOperationsInput | number
@@ -38739,7 +38739,7 @@ export namespace Prisma {
     startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     estimatedMinutes?: NullableIntFieldUpdateOperationsInput | number | null
-    actualMinutes?: IntFieldUpdateOperationsInput | number
+    actualMinutes?: NullableIntFieldUpdateOperationsInput | number | null
     pausedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     resumedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     totalPauseMinutes?: IntFieldUpdateOperationsInput | number
@@ -40353,7 +40353,7 @@ export namespace Prisma {
     startedAt?: Date | string | null
     completedAt?: Date | string | null
     estimatedMinutes?: number | null
-    actualMinutes?: number
+    actualMinutes?: number | null
     pausedAt?: Date | string | null
     resumedAt?: Date | string | null
     totalPauseMinutes?: number
@@ -40375,7 +40375,7 @@ export namespace Prisma {
     startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     estimatedMinutes?: NullableIntFieldUpdateOperationsInput | number | null
-    actualMinutes?: IntFieldUpdateOperationsInput | number
+    actualMinutes?: NullableIntFieldUpdateOperationsInput | number | null
     pausedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     resumedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     totalPauseMinutes?: IntFieldUpdateOperationsInput | number
@@ -40398,7 +40398,7 @@ export namespace Prisma {
     startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     estimatedMinutes?: NullableIntFieldUpdateOperationsInput | number | null
-    actualMinutes?: IntFieldUpdateOperationsInput | number
+    actualMinutes?: NullableIntFieldUpdateOperationsInput | number | null
     pausedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     resumedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     totalPauseMinutes?: IntFieldUpdateOperationsInput | number
@@ -40421,7 +40421,7 @@ export namespace Prisma {
     startedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     completedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     estimatedMinutes?: NullableIntFieldUpdateOperationsInput | number | null
-    actualMinutes?: IntFieldUpdateOperationsInput | number
+    actualMinutes?: NullableIntFieldUpdateOperationsInput | number | null
     pausedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     resumedAt?: NullableDateTimeFieldUpdateOperationsInput | Date | string | null
     totalPauseMinutes?: IntFieldUpdateOperationsInput | number

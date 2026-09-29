@@ -21,6 +21,13 @@ const findActivityById = (activityId) => {
       createdById: true,
       assignedToId: true,
       taskId: true,
+      startedAt: true,
+      startDate: true,
+      dueDate: true,
+      completedAt: true,
+      estimatedMinutes: true,
+      actualMinutes: true,
+      totalPauseMinutes: true,
       // 2. Include the task relation inside select
       task: {
         include: {

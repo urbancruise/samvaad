@@ -4,7 +4,7 @@ const { parseDate } = require("../../utils/date");
 
 const { ensureOwner } = require("../activities/activity.permission");
 const { createHistory } = require("../activities/activity.history.repository");
-
+const { calculateActualMinutes } = require("./activity.time");
 const {
   sendNotification,
   sendActivityUpdatedNotification,
@@ -180,18 +180,39 @@ const updateActivityStatusService = async (activityId, userId, data) => {
     const patch = {};
 
     if (data.status) {
-      validateStatusTransition(activity.status, data.status);
-      patch.status = data.status;
+  validateStatusTransition(activity.status, data.status);
+  patch.status = data.status;
+  const now = new Date();
 
-      if (data.status === "COMPLETED") {
-        patch.progress = 100;
-        patch.completedAt = new Date();
-      } else if (data.status === "PENDING") {
-        patch.progress = 0;
-      } else if (data.status === "IN_PROGRESS" && !activity.startedAt) {
-        patch.startedAt = new Date();
-      }
+  if (data.status === "IN_PROGRESS") {
+    if (!activity.startedAt) patch.startedAt = now;
+
+  } else if (data.status === "COMPLETED") {
+    // Auto-start: if the employee never pressed Start, fall back to the
+    // assigned start date (delete the `??` part to leave it untracked instead)
+    const startedAt =
+      activity.startedAt ??
+      (activity.startDate && activity.startDate < now ? activity.startDate : null);
+
+    patch.progress = 100;
+    patch.completedAt = now;
+
+    if (startedAt) {
+      if (!activity.startedAt) patch.startedAt = startedAt;
+      patch.actualMinutes = Math.max(
+        1,
+        calculateActualMinutes(startedAt, now, activity.totalPauseMinutes ?? 0)
+      );
     }
+
+  } else if (data.status === "PENDING") {
+    patch.progress = 0;
+    patch.startedAt = null;
+    patch.completedAt = null;
+    patch.actualMinutes = null;
+    patch.totalPauseMinutes = 0;
+  }
+}
 
     if (data.progress !== undefined && data.status !== "COMPLETED" && data.status !== "PENDING") {
       patch.progress = data.progress;

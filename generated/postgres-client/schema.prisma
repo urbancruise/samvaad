@@ -220,7 +220,7 @@ model Activity {
   completedAt      DateTime?
   estimatedMinutes Int?
 
-  actualMinutes Int @default(0)
+  actualMinutes Int?
 
   pausedAt  DateTime?
   resumedAt DateTime?
