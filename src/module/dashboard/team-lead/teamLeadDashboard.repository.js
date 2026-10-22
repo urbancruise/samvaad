@@ -1,228 +1,181 @@
-const { mysqlDb, postgresDb } = require("../../../config/db");
+const { postgresDb } = require("../../../config/db");
 
 const formatName = (u) => `${u?.firstName ?? ""} ${u?.lastName ?? ""}`.trim();
+const OPEN = { notIn: ["COMPLETED", "CANCELLED"] };
 
-const getDashboardOverview = async (teamLeadId) => {
-  // Step 1: hierarchy — who reports to this team lead — lives in MySQL
-  const employees = await mysqlDb.users.findMany({
-    where: { manager_id: teamLeadId },
-    select: { id: true, firstName: true, lastName: true, is_active: true },
-  });
+const average = (values) =>
+  values.length ? Number((values.reduce((s, v) => s + v, 0) / values.length).toFixed(2)) : 0;
 
-  const employeeIds = employees.map((employee) => employee.id);
+const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+
+const emptyDashboard = () => ({
+  overview: {
+    totalEmployees: 0, activeEmployees: 0, totalGoals: 0, completedGoals: 0,
+    totalTasks: 0, completedTasks: 0, overdueTasks: 0,
+    totalActivities: 0, completedActivities: 0, overdueActivities: 0,
+  },
+  performance: { averagePerformance: 0, averageCompletion: 0, averageProductivity: 0, trend: [] },
+  workload: [], topPerformers: [], needsAttention: [], activityFeed: [],
+  deadlines: { overdue: [], today: [], tomorrow: [], thisWeek: [] },
+});
+
+const getDashboardOverview = async (employees) => {
+  const employeeIds = employees.map((e) => e.id);
+  if (employeeIds.length === 0) return emptyDashboard();
+
   const now = new Date();
+  const mine = { in: employeeIds };
 
-  if (employeeIds.length === 0) {
-    return {
-      overview: {
-        totalEmployees: 0,
-        activeEmployees: 0,
-        totalGoals: 0,
-        completedGoals: 0,
-        totalTasks: 0,
-        completedTasks: 0,
-        totalActivities: 0,
-        completedActivities: 0,
-        overdueActivities: 0,
-      },
-      performance: { averagePerformance: 0, averageCompletion: 0, averageProductivity: 0 },
-      workload: [],
-      topPerformers: [],
-      needsAttention: [],
-      activityFeed: [],
-      deadlines: { overdue: [], today: [], tomorrow: [], thisWeek: [] },
-    };
-  }
-
-  // Step 2: all app-data stats live in Postgres, filtered by employeeIds
   const [
-    totalGoals,
-    completedGoals,
-    totalTasks,
-    completedTasks,
-    totalActivities,
-    completedActivities,
-    overdueActivities,
-    performances,
-    tasksForWorkload,
-    activitiesForWorkload,
-    recentActivities,
-    deadlineActivities,
+    totalGoals, completedGoals,
+    totalTasks, completedTasks, overdueTasks,
+    totalActivities, completedActivities, overdueActivities,
+    performances, openTasks, openActivities, recentActivities, deadlineActivities,
   ] = await Promise.all([
-    postgresDb.goal.count({ where: { assignedToId: { in: employeeIds } } }),
-    postgresDb.goal.count({ where: { assignedToId: { in: employeeIds }, status: "COMPLETED" } }),
-    postgresDb.task.count({ where: { assignedToId: { in: employeeIds } } }),
-    postgresDb.task.count({ where: { assignedToId: { in: employeeIds }, status: "COMPLETED" } }),
-    postgresDb.activity.count({ where: { assignedToId: { in: employeeIds } } }),
-    postgresDb.activity.count({ where: { assignedToId: { in: employeeIds }, status: "COMPLETED" } }),
-    postgresDb.activity.count({
-      where: { assignedToId: { in: employeeIds }, status: { not: "COMPLETED" }, dueDate: { lt: now } },
-    }),
+    postgresDb.goal.count({ where: { assignedToId: mine } }),
+    postgresDb.goal.count({ where: { assignedToId: mine, status: "COMPLETED" } }),
+    postgresDb.task.count({ where: { assignedToId: mine } }),
+    postgresDb.task.count({ where: { assignedToId: mine, status: "COMPLETED" } }),
+    postgresDb.task.count({ where: { assignedToId: mine, status: OPEN, dueDate: { lt: now } } }),
+    postgresDb.activity.count({ where: { assignedToId: mine } }),
+    postgresDb.activity.count({ where: { assignedToId: mine, status: "COMPLETED" } }),
+    postgresDb.activity.count({ where: { assignedToId: mine, status: OPEN, dueDate: { lt: now } } }),
     postgresDb.performance.findMany({
-      where: { userId: { in: employeeIds }, period: "MONTHLY" },
+      where: { userId: mine, period: "MONTHLY" },
+      orderBy: { startDate: "asc" },
     }),
     postgresDb.task.findMany({
-      where: { assignedToId: { in: employeeIds }, status: { not: "COMPLETED" } },
-      select: { id: true, assignedToId: true },
+      where: { assignedToId: mine, status: OPEN },
+      select: { assignedToId: true, dueDate: true },
     }),
     postgresDb.activity.findMany({
-      where: { assignedToId: { in: employeeIds } },
-      select: { assignedToId: true, status: true, dueDate: true },
+      where: { assignedToId: mine, status: OPEN },
+      select: { assignedToId: true, dueDate: true },
     }),
     postgresDb.activity.findMany({
-      where: { assignedToId: { in: employeeIds } },
+      where: { assignedToId: mine },
       take: 10,
       orderBy: { updatedAt: "desc" },
       select: {
-        id: true,
-        title: true,
-        status: true,
-        priority: true,
-        updatedAt: true,
-        assignedToId: true,
-        task: { select: { title: true } },
+        id: true, title: true, status: true, priority: true, updatedAt: true,
+        assignedToId: true, task: { select: { title: true } },
       },
     }),
     postgresDb.activity.findMany({
-      where: { assignedToId: { in: employeeIds }, status: { not: "COMPLETED" }, dueDate: { not: null } },
+      where: { assignedToId: mine, status: OPEN, dueDate: { not: null } },
       orderBy: { dueDate: "asc" },
       select: {
-        id: true,
-        title: true,
-        priority: true,
-        dueDate: true,
-        assignedToId: true,
-        task: { select: { title: true } },
+        id: true, title: true, priority: true, dueDate: true,
+        assignedToId: true, task: { select: { title: true } },
       },
     }),
   ]);
 
   const employeeMap = Object.fromEntries(employees.map((e) => [e.id, e]));
-  const average = (values) => {
-    if (!values.length) return 0;
-    return Number((values.reduce((sum, v) => sum + v, 0) / values.length).toFixed(2));
-  };
 
-  // Workload per employee
-  const workload = employees.map((employee) => {
-    const activeTasks = tasksForWorkload.filter((t) => t.assignedToId === employee.id).length;
-    const empActivities = activitiesForWorkload.filter((a) => a.assignedToId === employee.id);
-    const pendingActivities = empActivities.filter((a) => a.status !== "COMPLETED").length;
-    const overdue = empActivities.filter(
-      (a) => a.status !== "COMPLETED" && a.dueDate && a.dueDate < now
-    ).length;
+  // ---- Workload + needs attention (single pass, no O(n*m) filtering) ----
+  const stats = new Map(
+    employees.map((e) => [e.id, {
+      employeeId: e.id, employeeName: formatName(e),
+      activeTasks: 0, overdueTasks: 0, pendingActivities: 0, overdueActivities: 0,
+    }])
+  );
+  for (const t of openTasks) {
+    const s = stats.get(t.assignedToId);
+    if (!s) continue;
+    s.activeTasks++;
+    if (t.dueDate < now) s.overdueTasks++;
+  }
+  for (const a of openActivities) {
+    const s = stats.get(a.assignedToId);
+    if (!s) continue;
+    s.pendingActivities++;
+    if (a.dueDate && a.dueDate < now) s.overdueActivities++;
+  }
+  const workload = [...stats.values()];
 
-    return {
-      employeeId: employee.id,
-      employeeName: formatName(employee),
-      activeTasks,
-      pendingActivities,
-      overdueActivities: overdue,
-    };
-  });
+  const needsAttention = workload
+    .filter((w) => w.overdueTasks > 0 || w.overdueActivities > 0)
+    .sort((a, b) => (b.overdueTasks + b.overdueActivities) - (a.overdueTasks + a.overdueActivities))
+    .slice(0, 5);
 
-  // Leaderboard
-  const leaderboard = performances
-    .map((item) => ({
-      employeeId: item.userId,
-      employeeName: formatName(employeeMap[item.userId]),
-      performanceScore: item.performanceScore,
-      completionRate: item.completionRate,
-      productivityScore: item.productivityScore,
-      completedActivities: item.completedActivities,
-      completedTasks: item.completedTasks,
+  // ---- Performance: latest MONTHLY row per employee for cards/leaderboard ----
+  const latestByUser = new Map();
+  for (const p of performances) latestByUser.set(p.userId, p); // rows are ascending, so last wins
+  const latest = [...latestByUser.values()];
+
+  const leaderboard = latest
+    .map((p) => ({
+      employeeId: p.userId,
+      employeeName: formatName(employeeMap[p.userId]),
+      performanceScore: p.performanceScore,
+      completionRate: p.completionRate,
+      productivityScore: p.productivityScore,
+      completedActivities: p.completedActivities,
+      completedTasks: p.completedTasks,
     }))
     .sort((a, b) => b.performanceScore - a.performanceScore);
 
   const topPerformers = leaderboard.slice(0, 5);
-  const needsAttention = [...leaderboard].sort((a, b) => a.performanceScore - b.performanceScore).slice(0, 5);
 
-  // Activity feed
-  const activityFeed = recentActivities.map((activity) => ({
-    id: activity.id,
-    employee: formatName(employeeMap[activity.assignedToId]),
-    activity: activity.title,
-    task: activity.task?.title ?? null,
-    status: activity.status,
-    priority: activity.priority,
-    updatedAt: activity.updatedAt,
+  // ---- Trend: team average per month ----
+  const byMonth = new Map();
+  for (const p of performances) {
+    const k = monthKey(p.startDate);
+    if (!byMonth.has(k)) byMonth.set(k, []);
+    byMonth.get(k).push(p);
+  }
+  const trend = [...byMonth.entries()].map(([month, rows]) => ({
+    month,
+    performance: average(rows.map((r) => r.performanceScore)),
+    completion: average(rows.map((r) => r.completionRate)),
+    productivity: average(rows.map((r) => r.productivityScore)),
   }));
 
-  // Deadlines
-  const startOfToday = new Date();
-  startOfToday.setHours(0, 0, 0, 0);
+  // ---- Feed + deadlines ----
+  const activityFeed = recentActivities.map((a) => ({
+    id: a.id,
+    employee: formatName(employeeMap[a.assignedToId]),
+    activity: a.title,
+    task: a.task?.title ?? null,
+    status: a.status,
+    priority: a.priority,
+    updatedAt: a.updatedAt,
+  }));
 
-  const endOfToday = new Date(startOfToday);
-  endOfToday.setDate(endOfToday.getDate() + 1);
+  const startOfToday = new Date(); startOfToday.setHours(0, 0, 0, 0);
+  const endOfToday = new Date(startOfToday); endOfToday.setDate(endOfToday.getDate() + 1);
+  const endOfTomorrow = new Date(endOfToday); endOfTomorrow.setDate(endOfTomorrow.getDate() + 1);
+  const endOfWeek = new Date(startOfToday); endOfWeek.setDate(endOfWeek.getDate() + 7);
 
-  const endOfTomorrow = new Date(endOfToday);
-  endOfTomorrow.setDate(endOfTomorrow.getDate() + 1);
-
-  const endOfWeek = new Date(startOfToday);
-  endOfWeek.setDate(endOfWeek.getDate() + 7);
-
-  const formatDeadline = (activity) => ({
-    id: activity.id,
-    title: activity.title,
-    employee: formatName(employeeMap[activity.assignedToId]),
-    task: activity.task?.title ?? null,
-    priority: activity.priority,
-    dueDate: activity.dueDate,
+  const formatDeadline = (a) => ({
+    id: a.id, title: a.title, employee: formatName(employeeMap[a.assignedToId]),
+    task: a.task?.title ?? null, priority: a.priority, dueDate: a.dueDate,
   });
 
   const deadlines = {
     overdue: deadlineActivities.filter((a) => a.dueDate < startOfToday).map(formatDeadline),
-    today: deadlineActivities
-      .filter((a) => a.dueDate >= startOfToday && a.dueDate < endOfToday)
-      .map(formatDeadline),
-    tomorrow: deadlineActivities
-      .filter((a) => a.dueDate >= endOfToday && a.dueDate < endOfTomorrow)
-      .map(formatDeadline),
-    thisWeek: deadlineActivities
-      .filter((a) => a.dueDate >= endOfTomorrow && a.dueDate <= endOfWeek)
-      .map(formatDeadline),
+    today: deadlineActivities.filter((a) => a.dueDate >= startOfToday && a.dueDate < endOfToday).map(formatDeadline),
+    tomorrow: deadlineActivities.filter((a) => a.dueDate >= endOfToday && a.dueDate < endOfTomorrow).map(formatDeadline),
+    thisWeek: deadlineActivities.filter((a) => a.dueDate >= endOfTomorrow && a.dueDate <= endOfWeek).map(formatDeadline),
   };
 
   return {
     overview: {
       totalEmployees: employees.length,
       activeEmployees: employees.filter((e) => e.is_active).length,
-      totalGoals,
-      completedGoals,
-      totalTasks,
-      completedTasks,
-      totalActivities,
-      completedActivities,
-      overdueActivities,
+      totalGoals, completedGoals,
+      totalTasks, completedTasks, overdueTasks,
+      totalActivities, completedActivities, overdueActivities,
     },
     performance: {
-      averagePerformance: average(performances.map((p) => p.performanceScore)),
-      averageCompletion: average(performances.map((p) => p.completionRate)),
-      averageProductivity: average(performances.map((p) => p.productivityScore)),
+      averagePerformance: average(latest.map((p) => p.performanceScore)),
+      averageCompletion: average(latest.map((p) => p.completionRate)),
+      averageProductivity: average(latest.map((p) => p.productivityScore)),
+      trend,
     },
-    workload,
-    topPerformers,
-    needsAttention,
-    activityFeed,
-    deadlines,
+    workload, topPerformers, needsAttention, activityFeed, deadlines,
   };
 };
 
-const getTeamPerformanceTrend = async (employeeIds) => {
-  return postgresDb.performance.findMany({
-    where: { userId: { in: employeeIds }, period: "MONTHLY" },
-    orderBy: { startDate: "asc" },
-    select: {
-      userId: true,
-      startDate: true,
-      performanceScore: true,
-      completionRate: true,
-      productivityScore: true,
-    },
-  });
-};
-
-module.exports = {
-  getDashboardOverview,
-  getTeamPerformanceTrend,
-};
+module.exports = { getDashboardOverview };
