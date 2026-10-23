@@ -9,6 +9,8 @@ const {
   searchCalendar,
   getCalendarAnalytics
 } = require("./calendar.repository");
+const { mysqlDb } = require("../../config/db");
+const { normalizeRole, getSubordinateIds } = require("../../utils/hierarchy.service");
 
 const { 
   buildCalendarEvents, 
@@ -18,39 +20,80 @@ const {
 } = require("./calendar.helper");
 
 const { validateWorkingHours } = require("./calendar.validation");
+const resolveRange = (start, end) => {
+  const startDate = start ? new Date(start) : new Date();
+  const endDate = end ? new Date(end) : new Date(startDate);
+  if (!end) {
+    startDate.setDate(1);
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setMonth(startDate.getMonth() + 1, 0);
+    endDate.setHours(23, 59, 59, 999);
+  }
+  return { startDate, endDate };
+};
 
-const getCalendarEventsService = async (userId, start, end) => {
+// The helper strips assignee / description / parent / progress, so re-attach them by id.
+const annotateEvents = async (events, data) => {
+  const meta = new Map();
+  data.goals.forEach((g) => meta.set(g.id, { owner: g.assignedToId, description: g.description, parent: null, progress: g.progress }));
+  data.tasks.forEach((t) => meta.set(t.id, { owner: t.assignedToId, description: t.description, parent: t.goal?.title ?? null, progress: t.progress }));
+  data.activities.forEach((a) => meta.set(a.id, { owner: a.assignedToId, description: a.description, parent: a.task?.title ?? null, progress: a.progress }));
+
+  const ownerIds = [...new Set([...meta.values()].map((m) => m.owner))];
+  const users = ownerIds.length
+    ? await mysqlDb.users.findMany({
+        where: { id: { in: ownerIds } },
+        select: { id: true, firstName: true, lastName: true },
+      })
+    : [];
+  const names = Object.fromEntries(
+    users.map((u) => [u.id, `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim()])
+  );
+
+  return events.map((e) => {
+    const m = meta.get(e.id) ?? {};
+    return {
+      ...e,
+      progress: m.progress ?? e.progress ?? 0,
+      description: m.description ?? null,
+      parentTitle: m.parent ?? null,
+      assignedToId: m.owner ?? null,
+      assigneeName: names[m.owner] ?? null,
+    };
+  });
+};
+
+// userIds: a single id (own / one person) or an array (team)
+const getCalendarEventsService = async (userIds, start, end) => {
   try {
-    const startDate = start ? new Date(start) : new Date();
-    const endDate = end ? new Date(end) : new Date(startDate);
-
-    if (!end) {
-      startDate.setDate(1);
-      startDate.setHours(0, 0, 0, 0);
-
-      endDate.setMonth(startDate.getMonth() + 1, 0);
-      endDate.setHours(23, 59, 59, 999);
-    }
-
-    const data = await getCalendarData(
-      userId,
-      startDate,
-      endDate
-    );
-
-    // FIX:
-    // buildMonthlyCalendar expects
-    // { goals, tasks, activities }
-    return buildMonthlyCalendar(data);
-
+    const { startDate, endDate } = resolveRange(start, end);
+    const data = await getCalendarData(userIds, startDate, endDate);
+    return annotateEvents(buildMonthlyCalendar(data), data);
   } catch (error) {
-    console.error(
-      "Error in getCalendarEventsService:",
-      error
-    );
+    console.error("Error in getCalendarEventsService:", error);
     throw error;
   }
 };
+
+// Admin = whole org (except self). Everyone else = all juniors below them.
+const getTeamScopeIds = async (viewer) => {
+  const role = normalizeRole(viewer.role);
+  if (role === "SUPER_ADMIN" || role === "ADMIN") {
+    const rows = await mysqlDb.users.findMany({
+      where: { id: { not: Number(viewer.id) } },
+      select: { id: true },
+    });
+    return rows.map((r) => r.id);
+  }
+  return [...(await getSubordinateIds(viewer.id))];
+};
+
+const getTeamCalendarEventsService = async (viewer, start, end) => {
+  const ids = await getTeamScopeIds(viewer);
+  return getCalendarEventsService(ids, start, end);
+};
+
+
 const getTodayAgendaService = async (userId) => {
   try {
     const data = await getTodayAgenda(userId);
@@ -170,4 +213,5 @@ module.exports = {
   rescheduleEventService,
   searchCalendarService,
   getCalendarAnalyticsService,
+  getTeamCalendarEventsService
 };

@@ -2,12 +2,14 @@ const ApiError = require("../../utils/ApiError");
 
 const {
   getAllUsers,
+  getDepartments,
   getUserProfile,
   getUserGoals,
   getUserTasks,
   getUserActivities,
 } = require("./admin.repository");
 
+const getDepartmentsService = () => getDepartments();
 const getAllUsersService = async (query) => {
   return getAllUsers(query);
 };
@@ -42,4 +44,5 @@ module.exports = {
   getUserGoalsService,
   getUserTasksService,
   getUserActivitiesService,
+  getDepartmentsService
 };

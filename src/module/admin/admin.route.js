@@ -5,6 +5,7 @@ const ApiError = require("../../utils/ApiError");
 
 const {
   getAllUsers,
+  getDepartments,
   getUserProfile,
   getUserGoals,
   getUserTasks,
@@ -28,7 +29,7 @@ const requireSuperAdmin = (req, res, next) => {
 };
 
 router.use(auth, requireSuperAdmin);
-
+router.get("/team/departments", getDepartments);
 router.get("/team", getAllUsers);
 router.get("/team/:userId", getUserProfile);
 router.get("/team/:userId/goals", getUserGoals);

@@ -1,42 +1,33 @@
 const { postgresDb } = require("../../config/db");
 
-const getCalendarData = async (userId, start, end) => {
+const MAX_PER_TYPE = 1500;
+
+const getCalendarData = async (userIds, start, end) => {
   try {
+    if (Array.isArray(userIds) && userIds.length === 0) {
+      return { goals: [], tasks: [], activities: [] };
+    }
+    const assignedToId = Array.isArray(userIds) ? { in: userIds } : userIds;
+    const overlap = { startDate: { lte: end }, dueDate: { gte: start } };
+    const opts = { take: MAX_PER_TYPE, orderBy: { startDate: "asc" } };
+
     const [goals, tasks, activities] = await Promise.all([
-      postgresDb.goal.findMany({
-        where: {
-          assignedToId: userId,
-          OR: [
-            { startDate: { gte: start, lte: end } },
-            { dueDate: { gte: start, lte: end } },
-          ],
-        },
-      }),
+      postgresDb.goal.findMany({ where: { assignedToId, ...overlap }, ...opts }),
       postgresDb.task.findMany({
-        where: {
-          assignedToId: userId,
-          OR: [
-            { startDate: { gte: start, lte: end } },
-            { dueDate: { gte: start, lte: end } },
-          ],
-        },
+        where: { assignedToId, ...overlap },
+        include: { goal: { select: { title: true } } },
+        ...opts,
       }),
       postgresDb.activity.findMany({
-  where: {
-    assignedToId: userId,
-    OR: [
-      { startDate: { gte: start, lte: end } },
-      { dueDate: { gte: start, lte: end } },
-    ],
-  },
-  include: {
-    task: {
-      select: {
-        goalId: true,
-      },
-    },
-  },
-}),
+        where: {
+          assignedToId,
+          startDate: { lte: end },
+          // dueDate is optional on activities: no due date = single-day item
+          OR: [{ dueDate: { gte: start } }, { dueDate: null, startDate: { gte: start } }],
+        },
+        include: { task: { select: { goalId: true, title: true } } },
+        ...opts,
+      }),
     ]);
 
     return { goals, tasks, activities };

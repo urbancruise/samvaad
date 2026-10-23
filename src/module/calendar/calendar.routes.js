@@ -13,6 +13,7 @@ const {
   getUserCalendarEvents,
   getUserTodayAgenda,
   getUserWeeklyAgenda,
+  getTeamCalendarEvents,
 } = require("./calendar.controller");
 
 router.use(auth);
@@ -51,6 +52,8 @@ router.get(
     "/analytics",
     getCalendarAnalytics
 );
+
+router.get("/team/events", getTeamCalendarEvents);
 
 router.get(
     "/:userId/events",

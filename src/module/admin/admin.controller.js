@@ -7,6 +7,7 @@ const {
   getUserGoalsService,
   getUserTasksService,
   getUserActivitiesService,
+  getDepartmentsService
 } = require("./admin.service");
 
 const getAllUsers = asyncHandler(async (req, res) => {
@@ -14,6 +15,10 @@ const getAllUsers = asyncHandler(async (req, res) => {
   return res.status(200).json(
     new ApiResponse(200, users, "Users fetched successfully")
   );
+});
+const getDepartments = asyncHandler(async (req, res) => {
+  const data = await getDepartmentsService();
+  return res.status(200).json(new ApiResponse(200, data, "Departments fetched successfully"));
 });
 
 const getUserProfile = asyncHandler(async (req, res) => {
@@ -46,6 +51,7 @@ const getUserActivities = asyncHandler(async (req, res) => {
 
 module.exports = {
   getAllUsers,
+  getDepartments,
   getUserProfile,
   getUserGoals,
   getUserTasks,

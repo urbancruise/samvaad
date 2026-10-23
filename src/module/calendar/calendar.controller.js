@@ -10,7 +10,8 @@ const {
   getMonthlyCalendarService,
   rescheduleEventService,
   searchCalendarService,
-  getCalendarAnalyticsService
+  getCalendarAnalyticsService,
+  getTeamCalendarEventsService
 } = require("./calendar.service");
 
 const getCalendarEvents = asyncHandler(async (req, res) => {
@@ -24,6 +25,14 @@ const getCalendarEvents = asyncHandler(async (req, res) => {
 
   return res.status(200).json(
     new ApiResponse(200, events, "Calendar events fetched successfully")
+  );
+});
+
+const getTeamCalendarEvents = asyncHandler(async (req, res) => {
+  const { start, end } = req.query;
+  const events = await getTeamCalendarEventsService(req.user, start, end);
+  return res.status(200).json(
+    new ApiResponse(200, events, "Team calendar fetched successfully")
   );
 });
 
@@ -152,4 +161,5 @@ module.exports = {
   getUserCalendarEvents,
   getUserTodayAgenda,
   getUserWeeklyAgenda,
+  getTeamCalendarEvents
 };

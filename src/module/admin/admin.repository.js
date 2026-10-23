@@ -1,91 +1,10 @@
 const { mysqlDb, postgresDb } = require("../../config/db");
+const { listUsers, getDepartmentOptions } = require("../common/userDirectory");
 
-const formatName = (u) => `${u.firstName ?? ""} ${u.lastName ?? ""}`.trim();
 
-/**
- * Unlike every other role's repository (findManagedEmployee/TL/Manager,
- * all scoped by manager_id), SUPER_ADMIN sees the entire org — no
- * manager_id filter, no ownership check on individual users.
- */
-const getAllUsers = async (query = {}) => {
-  const where = {};
-  if (query.role) where.access_role = query.role;
-  if (query.search) {
-    where.OR = [
-      { firstName: { contains: query.search, mode: "insensitive" } },
-      { lastName: { contains: query.search, mode: "insensitive" } },
-      { username: { contains: query.search, mode: "insensitive" } },
-      { officeEmail: { contains: query.search, mode: "insensitive" } },
-    ];
-  }
 
-  const users = await mysqlDb.users.findMany({
-    where,
-    select: {
-      id: true,
-      firstName: true,
-      lastName: true,
-      username: true,
-      officeEmail: true,
-      access_role: true,
-      manager_id: true,
-      is_active: true,
-    },
-    orderBy: { firstName: "asc" },
-  });
-
-  if (users.length === 0) return [];
-
-  const userIds = users.map((u) => u.id);
-  const now = new Date();
-
-  const [goals, tasks, activities, performances] = await Promise.all([
-    postgresDb.goal.findMany({
-      where: { assignedToId: { in: userIds } },
-      select: { assignedToId: true, status: true },
-    }),
-    postgresDb.task.findMany({
-      where: { assignedToId: { in: userIds } },
-      select: { assignedToId: true, status: true },
-    }),
-    postgresDb.activity.findMany({
-      where: { assignedToId: { in: userIds } },
-      select: { assignedToId: true, status: true, dueDate: true },
-    }),
-    postgresDb.performance.findMany({
-      where: { userId: { in: userIds }, period: "MONTHLY" },
-      orderBy: { startDate: "desc" },
-    }),
-  ]);
-
-  return users.map((u) => {
-    const uGoals = goals.filter((g) => g.assignedToId === u.id);
-    const uTasks = tasks.filter((t) => t.assignedToId === u.id);
-    const uActivities = activities.filter((a) => a.assignedToId === u.id);
-    const performance = performances.find((p) => p.userId === u.id);
-
-    return {
-      id: u.id,
-      fullName: formatName(u),
-      email: u.officeEmail,
-      username: u.username,
-      role: u.access_role,
-      managerId: u.manager_id,
-      isActive: u.is_active,
-      performanceScore: performance?.performanceScore ?? 0,
-      totalGoals: uGoals.length,
-      completedGoals: uGoals.filter((g) => g.status === "COMPLETED").length,
-      totalTasks: uTasks.length,
-      completedTasks: uTasks.filter((t) => t.status === "COMPLETED").length,
-      totalActivities: uActivities.length,
-      completedActivities: uActivities.filter((a) => a.status === "COMPLETED").length,
-      overdueActivities: uActivities.filter(
-        (a) => a.status !== "COMPLETED" && a.dueDate && a.dueDate < now
-      ).length,
-    };
-  });
-};
-
+const getAllUsers = (query = {}) => listUsers({}, query);
+const getDepartments = () => getDepartmentOptions({});
 // No manager_id constraint — SUPER_ADMIN can view any user by id.
 const findAnyUser = async (userId) => {
   return mysqlDb.users.findFirst({
@@ -135,7 +54,7 @@ const getUserProfile = async (userId) => {
   return {
     profile: {
       id: user.id,
-      fullName: formatName(user),
+      fullName: [user.firstName, user.lastName].filter(Boolean).join(" "),
       email: user.officeEmail,
       username: user.username,
       role: user.access_role,
@@ -246,11 +165,4 @@ const getUserActivities = async (userId) => {
   }));
 };
 
-module.exports = {
-  getAllUsers,
-  findAnyUser,
-  getUserProfile,
-  getUserGoals,
-  getUserTasks,
-  getUserActivities,
-};
+module.exports = { getAllUsers, getDepartments, findAnyUser, getUserProfile, getUserGoals, getUserTasks, getUserActivities };
