@@ -96,9 +96,23 @@ const updateConversation = async (conversationId, data) => {
 };
 
 const addParticipants = async (conversationId, userIds) => {
+  // Someone who previously left still has a row (leftAt set) — bring
+  // them back instead of letting skipDuplicates silently ignore them.
+  await postgresDb.conversationParticipant.updateMany({
+    where: { conversationId, userId: { in: userIds } },
+    data: { leftAt: null, role: "MEMBER", joinedAt: new Date() },
+  });
+
   return postgresDb.conversationParticipant.createMany({
     data: userIds.map((userId) => ({ conversationId, userId, role: "MEMBER" })),
     skipDuplicates: true,
+  });
+};
+
+const updateParticipantRole = async (conversationId, userId, role) => {
+  return postgresDb.conversationParticipant.update({
+    where: { conversationId_userId: { conversationId, userId } },
+    data: { role },
   });
 };
 
@@ -242,6 +256,7 @@ module.exports = {
   findUserConversations,
   updateConversation,
   addParticipants,
+  updateParticipantRole,
   removeParticipant,
   touchConversation,
   createMessage,

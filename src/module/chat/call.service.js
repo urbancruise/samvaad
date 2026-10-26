@@ -5,62 +5,101 @@ const callRepo = require("./call.repository");
 const chatRepo = require("./chat.repository");
 const chatService = require("./chat.service");
 
+// How long an unanswered call rings before it becomes a missed call.
+const RING_TIMEOUT_MS = 45 * 1000;
+// A call still "ringing" this long after it started is a leftover
+// (e.g. server restarted mid-ring) and must not block new calls.
+const STALE_RINGING_MS = RING_TIMEOUT_MS + 15 * 1000;
+
+const PENDING_STATUSES = [CALL_PARTICIPANT_STATUS.INVITED, CALL_PARTICIPANT_STATUS.RINGING];
+const ACTIVE_STATUSES = [CALL_STATUS.RINGING, CALL_STATUS.ONGOING];
+
 const formatDuration = (ms) => {
-  const totalSeconds = Math.round(ms / 1000);
+  const totalSeconds = Math.max(0, Math.round(ms / 1000));
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = totalSeconds % 60;
   if (minutes === 0) return `${seconds}s`;
   return `${minutes}m ${seconds}s`;
 };
 
-const initiateCallService = async (conversationId, callerId, type) => {
-  const conversation = await chatService.assertParticipant(conversationId, callerId)
-    .then(() => chatRepo.findConversationById(conversationId));
+// The moment someone OTHER than the caller first joined — i.e. when
+// the call was actually answered. null = nobody ever picked up.
+const answeredAt = (call) => {
+  const times = call.participants
+    .filter((p) => p.userId !== call.startedById && p.joinedAt)
+    .map((p) => new Date(p.joinedAt).getTime());
+  return times.length ? Math.min(...times) : null;
+};
 
+const countJoined = (call) =>
+  call.participants.filter((p) => p.status === CALL_PARTICIPANT_STATUS.JOINED).length;
+
+const hasPending = (call) => call.participants.some((p) => PENDING_STATUSES.includes(p.status));
+
+/**
+ * Finishes a call: closes every open participant row, sets the final
+ * status and posts the WhatsApp-style log line ("Video call · 5m 32s",
+ * "Missed voice call", "Declined video call") into the conversation.
+ */
+const endCallInternal = async (call, requestedStatus) => {
+  const answered = answeredAt(call);
+
+  await callRepo.markRemainingParticipantsMissed(call.id);
+  await callRepo.closeAnyOpenJoins(call.id);
+
+  const finalStatus = answered
+    ? CALL_STATUS.ENDED
+    : requestedStatus === CALL_STATUS.DECLINED
+    ? CALL_STATUS.DECLINED
+    : CALL_STATUS.MISSED;
+
+  await callRepo.updateCallStatus(call.id, finalStatus, { endedAt: new Date() });
+
+  const kind = call.type === "VIDEO" ? "video" : "voice";
+  let body;
+  if (answered) {
+    body = `${call.type === "VIDEO" ? "Video" : "Voice"} call · ${formatDuration(Date.now() - answered)}`;
+  } else if (finalStatus === CALL_STATUS.DECLINED) {
+    body = `Declined ${kind} call`;
+  } else {
+    body = `Missed ${kind} call`;
+  }
+
+  const message = await chatService.createSystemMessage(call.conversationId, call.startedById, body);
+  return { message, status: finalStatus };
+};
+
+const endedResult = (call, { message, status }) => ({
+  callId: call.id,
+  conversationId: call.conversationId,
+  ended: true,
+  status,
+  message,
+  participantIds: call.participants.map((p) => p.userId),
+});
+
+/**
+ * Starts a call for every current participant of the conversation
+ * (minus the caller). Throws if the conversation already has a live
+ * call — join that one instead.
+ */
+const initiateCallService = async (conversationId, callerId, type) => {
+  await chatService.assertParticipant(conversationId, callerId);
+  const conversation = await chatRepo.findConversationById(conversationId);
   if (!conversation) throw new ApiError(404, "Conversation not found");
 
   const existing = await callRepo.findActiveCallForConversation(conversationId);
-
   if (existing) {
-    const isExistingParticipant = existing.participants.some((p) => p.userId === callerId);
+    const age = Date.now() - new Date(existing.startedAt).getTime();
+    const stale =
+      countJoined(existing) === 0 ||
+      (existing.status === CALL_STATUS.RINGING && age > STALE_RINGING_MS);
 
-    /**
-     * FIX: previously this always threw 409, even when the "active
-     * call" was stuck because of a dropped connection / crashed tab
-     * and the requester is one of its rightful participants. That
-     * left conversations permanently unable to start a new call until
-     * someone manually cleared the DB row — and the frontend had no
-     * way to recover, it just errored silently (uncaught rejection).
-     *
-     * If the caller is already a participant of the stuck/active
-     * call, treat this exactly like rejoining it (same mechanics as
-     * acceptCallService) instead of failing.
-     */
-    if (isExistingParticipant) {
-      await callRepo.updateParticipantStatus(existing.id, callerId, CALL_PARTICIPANT_STATUS.JOINED, {
-        joinedAt: new Date(),
-      });
-
-      if (existing.status === CALL_STATUS.RINGING) {
-        await callRepo.updateCallStatus(existing.id, CALL_STATUS.ONGOING);
-      }
-
-      const refreshed = await callRepo.findCallById(existing.id);
-      const userMap = await chatService.hydrateUsers(refreshed.participants.map((p) => p.userId));
-
-      return {
-        id: refreshed.id,
-        conversationId,
-        type: refreshed.type,
-        status: refreshed.status,
-        startedBy: userMap[refreshed.startedById],
-        participants: refreshed.participants.map((p) => ({ ...userMap[p.userId], status: p.status })),
-        startedAt: refreshed.startedAt,
-        rejoined: true, // lets the frontend know this wasn't a fresh call
-      };
+    if (!stale) {
+      throw new ApiError(409, "There is already an active call in this chat");
     }
-
-    throw new ApiError(409, `This conversation already has an active call (${existing.id})`);
+    // Leftover from a crash/restart — close it so it can't block calls forever.
+    await endCallInternal(existing, CALL_STATUS.MISSED);
   }
 
   const invitedUserIds = conversation.participants
@@ -80,6 +119,8 @@ const initiateCallService = async (conversationId, callerId, type) => {
   return {
     id: call.id,
     conversationId,
+    conversationName: conversation.name,
+    isGroup: conversation.type === "GROUP",
     type: call.type,
     status: call.status,
     startedBy: userMap[callerId],
@@ -101,6 +142,10 @@ const assertCallParticipant = async (callId, userId) => {
 const acceptCallService = async (callId, userId) => {
   const { call } = await assertCallParticipant(callId, userId);
 
+  if (!ACTIVE_STATUSES.includes(call.status)) {
+    throw new ApiError(410, "This call has already ended");
+  }
+
   await callRepo.updateParticipantStatus(callId, userId, CALL_PARTICIPANT_STATUS.JOINED, {
     joinedAt: new Date(),
   });
@@ -109,6 +154,8 @@ const acceptCallService = async (callId, userId) => {
     await callRepo.updateCallStatus(callId, CALL_STATUS.ONGOING);
   }
 
+  // Everyone already in the call before this join — they are the ones
+  // who send a WebRTC offer to the newcomer.
   const alreadyJoined = call.participants.filter(
     (p) => p.status === CALL_PARTICIPANT_STATUS.JOINED && p.userId !== userId
   );
@@ -122,77 +169,60 @@ const acceptCallService = async (callId, userId) => {
 };
 
 const declineCallService = async (callId, userId) => {
-  await assertCallParticipant(callId, userId);
+  const { call } = await assertCallParticipant(callId, userId);
+  const base = { callId, conversationId: call.conversationId, ended: false, message: null, participantIds: [] };
+
+  if (!ACTIVE_STATUSES.includes(call.status)) return base;
+
   await callRepo.updateParticipantStatus(callId, userId, CALL_PARTICIPANT_STATUS.DECLINED);
 
-  const call = await callRepo.findCallById(callId);
-  const stillPending = call.participants.some((p) =>
-    [CALL_PARTICIPANT_STATUS.INVITED, CALL_PARTICIPANT_STATUS.RINGING].includes(p.status)
-  );
-  const stillJoined = call.participants.some((p) => p.status === CALL_PARTICIPANT_STATUS.JOINED);
+  const fresh = await callRepo.findCallById(callId);
 
-  if (!stillPending && !stillJoined) {
-    await endCallInternal(call, CALL_STATUS.DECLINED);
+  // Nobody left to answer and at most the caller is in the room: the
+  // call is over (this was the bug where a declined 1:1 call left the
+  // caller staring at an empty screen forever).
+  if (!hasPending(fresh) && countJoined(fresh) <= 1) {
+    return endedResult(fresh, await endCallInternal(fresh, CALL_STATUS.DECLINED));
   }
 
-  return { callId, conversationId: call.conversationId };
+  return base;
 };
 
+/**
+ * A participant leaving. The call ends when nobody is left in it, or
+ * when only one person remains and nobody else is still ringing —
+ * a call with yourself alone in it is pointless.
+ */
 const leaveCallService = async (callId, userId) => {
   const { call } = await assertCallParticipant(callId, userId);
+  const base = { callId, conversationId: call.conversationId, ended: false, message: null, participantIds: [] };
+
+  if (!ACTIVE_STATUSES.includes(call.status)) return base;
 
   await callRepo.updateParticipantStatus(callId, userId, CALL_PARTICIPANT_STATUS.LEFT, {
     leftAt: new Date(),
   });
 
-  const refreshed = await callRepo.findCallById(callId);
-  const stillJoined = refreshed.participants.some((p) => p.status === CALL_PARTICIPANT_STATUS.JOINED);
+  const fresh = await callRepo.findCallById(callId);
+  const joined = countJoined(fresh);
 
-  let ended = false;
-  if (!stillJoined) {
-    await endCallInternal(refreshed, CALL_STATUS.ENDED);
-    ended = true;
+  if (joined === 0 || (joined === 1 && !hasPending(fresh))) {
+    return endedResult(fresh, await endCallInternal(fresh, CALL_STATUS.ENDED));
   }
 
-  return { callId, conversationId: call.conversationId, ended };
+  return base;
 };
 
-const endCallInternal = async (call, finalStatus) => {
-  await callRepo.markRemainingParticipantsMissed(call.id);
-  await callRepo.closeAnyOpenJoins(call.id);
-  await callRepo.updateCallStatus(call.id, finalStatus, { endedAt: new Date() });
+/**
+ * Called by a timer ~45s after a call starts. If nobody has picked up
+ * by then, the call becomes a missed call (and stops blocking new calls).
+ * Returns null when the call was already answered/ended.
+ */
+const missUnansweredCallService = async (callId) => {
+  const call = await callRepo.findCallById(callId);
+  if (!call || call.status !== CALL_STATUS.RINGING) return null;
 
-  /**
-   * FIX: this used to count participants whose CURRENT status is
-   * JOINED — but by the time endCallInternal runs, everyone who was
-   * on the call has already been transitioned to LEFT (that's what
-   * triggers ending the call). That count is therefore always 0,
-   * which meant EVERY completed call — no matter how long — was
-   * logged as "Missed call" instead of showing its real duration.
-   *
-   * Use `joinedAt` instead: it's set once when a participant actually
-   * joins and is never cleared when they later leave, so it reliably
-   * answers "did this person actually connect at some point?" rather
-   * than "are they currently connected?".
-   *
-   * NOTE: this assumes `joinedAt` persists after a participant leaves
-   * (i.e. it's a separate historical field from `status`, matching
-   * how `leftAt` is tracked alongside status elsewhere in this file).
-   * If your schema clears `joinedAt` on leave, this needs a small
-   * adjustment — worth a quick check against call.repository.js /
-   * the Prisma schema for the CallParticipant model.
-   */
-  const everJoinedCount = call.participants.filter((p) => p.joinedAt).length;
-  const durationMs = new Date() - new Date(call.startedAt);
-
-  let logBody;
-  if (finalStatus === CALL_STATUS.DECLINED || everJoinedCount <= 1) {
-    logBody = `Missed ${call.type.toLowerCase()} call`;
-  } else {
-    logBody = `${call.type === "VIDEO" ? "Video" : "Audio"} call · ${formatDuration(durationMs)}`;
-  }
-
-  return chatService.createSystemMessage(call.conversationId, call.startedById, logBody);
+  return endedResult(call, await endCallInternal(call, CALL_STATUS.MISSED));
 };
 
 const getCallHistoryService = async (userId, { page = 1, limit = 30 } = {}) => {
@@ -212,30 +242,13 @@ const getCallHistoryService = async (userId, { page = 1, limit = 30 } = {}) => {
   }));
 };
 
-const sweepStaleCallsService = async (maxAgeMs = 4 * 60 * 60 * 1000) => {
-  const staleCalls = await callRepo.findStaleActiveCalls(maxAgeMs);
-
-  const results = [];
-  for (const call of staleCalls) {
-    try {
-      await endCallInternal(call, CALL_STATUS.ENDED);
-      results.push({ callId: call.id, conversationId: call.conversationId, ok: true });
-    } catch (err) {
-      // One bad row shouldn't block the rest of the sweep.
-      console.error(`Failed to sweep stale call ${call.id}:`, err.message);
-      results.push({ callId: call.id, ok: false, error: err.message });
-    }
-  }
-
-  return results;
-};
-
 module.exports = {
+  RING_TIMEOUT_MS,
   initiateCallService,
   assertCallParticipant,
   acceptCallService,
   declineCallService,
   leaveCallService,
+  missUnansweredCallService,
   getCallHistoryService,
-  sweepStaleCallsService
 };

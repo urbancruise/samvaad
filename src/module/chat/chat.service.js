@@ -1,6 +1,7 @@
 const { mysqlDb } = require("../../config/db");
 const ApiError = require("../../utils/ApiError");
 const { sendNotification } = require("../notifications/notification.service");
+const { emitToUsers, emitToRoom, removeUserFromRoom } = require("../../socket/emitter");
 const {
   CONVERSATION_TYPE,
   PARTICIPANT_ROLE,
@@ -87,6 +88,30 @@ const assertGroupAdmin = (participant) => {
   }
 };
 
+// ---- Realtime helpers -----------------------------------------------------
+
+const nameOf = (userMap, id) => userMap[id]?.fullName || "Someone";
+
+/**
+ * Tells every current participant (plus any extra ids, e.g. a user who
+ * was just removed) to refetch their conversation list. Cheaper and
+ * safer than trying to patch every possible change client-side.
+ */
+const notifyConversationChanged = async (conversationId, extraUserIds = []) => {
+  const conversation = await repo.findConversationById(conversationId);
+  const ids = [...(conversation?.participants.map((p) => p.userId) ?? []), ...extraUserIds];
+  emitToUsers(ids, "conversation:refresh", { conversationId });
+};
+
+// Group events ("X added Y", "X renamed the group") appear in the chat
+// like WhatsApp's centered grey notices.
+const postSystemMessage = async (conversationId, actorId, body) => {
+  // eslint-disable-next-line no-use-before-define
+  const message = await createSystemMessage(conversationId, actorId, body, MESSAGE_TYPE.SYSTEM);
+  emitToRoom(`conversation:${conversationId}`, "message:new", message);
+  return message;
+};
+
 // ---- Conversations ------------------------------------------------------
 
 const createConversationService = async (userId, data) => {
@@ -97,10 +122,22 @@ const createConversationService = async (userId, data) => {
     }
 
     const existing = await repo.findDirectConversationBetween(userId, otherUserId);
-    if (existing) return existing;
+    if (existing) return getConversationService(existing.id, userId);
   }
 
-  return repo.createConversation({ ...data, createdById: userId });
+  const created = await repo.createConversation({ ...data, createdById: userId });
+
+  if (data.type === CONVERSATION_TYPE.GROUP) {
+    const userMap = await hydrateUsers([userId]);
+    await postSystemMessage(created.id, userId, `${nameOf(userMap, userId)} created group "${data.name}"`);
+    // Members should see a new group immediately. A DIRECT chat is
+    // deliberately NOT pushed to the other person until the first
+    // message is sent (the client refetches when it sees a message for
+    // a conversation it doesn't know yet) — same as WhatsApp.
+    await notifyConversationChanged(created.id);
+  }
+
+  return getConversationService(created.id, userId);
 };
 
 const getUserConversationsService = async (userId) => {
@@ -169,9 +206,32 @@ const getConversationService = async (conversationId, userId) => {
 
 const updateConversationService = async (conversationId, userId, data) => {
   const participant = await assertParticipant(conversationId, userId);
+  const conversation = await repo.findConversationById(conversationId);
+
+  if (conversation.type !== CONVERSATION_TYPE.GROUP) {
+    throw new ApiError(400, "Only group conversations can be edited");
+  }
   assertGroupAdmin(participant);
 
-  return repo.updateConversation(conversationId, data);
+  const changes = {};
+  if (data.name !== undefined) changes.name = data.name.trim();
+  if (data.avatarUrl !== undefined) changes.avatarUrl = data.avatarUrl;
+
+  if (Object.keys(changes).length > 0) {
+    await repo.updateConversation(conversationId, changes);
+  }
+
+  if (changes.name && changes.name !== conversation.name) {
+    const userMap = await hydrateUsers([userId]);
+    await postSystemMessage(
+      conversationId,
+      userId,
+      `${nameOf(userMap, userId)} changed the group name to "${changes.name}"`
+    );
+  }
+
+  await notifyConversationChanged(conversationId);
+  return getConversationService(conversationId, userId);
 };
 
 const addParticipantsService = async (conversationId, userId, participantIds) => {
@@ -183,31 +243,83 @@ const addParticipantsService = async (conversationId, userId, participantIds) =>
   }
   assertGroupAdmin(participant);
 
-  await repo.addParticipants(conversationId, participantIds);
+  // Ignore people already in the group, and ids that aren't real users.
+  const alreadyIn = new Set(conversation.participants.map((p) => p.userId));
+  const candidateIds = [...new Set(participantIds)].filter((id) => !alreadyIn.has(id));
+  const userMap = await hydrateUsers([userId, ...candidateIds]);
+  const newIds = candidateIds.filter((id) => userMap[id]);
 
-  for (const addedId of participantIds) {
+  if (newIds.length === 0) {
+    return getConversationService(conversationId, userId);
+  }
+
+  await repo.addParticipants(conversationId, newIds);
+
+  const addedNames = newIds.map((id) => nameOf(userMap, id)).join(", ");
+  await postSystemMessage(conversationId, userId, `${nameOf(userMap, userId)} added ${addedNames}`);
+
+  for (const addedId of newIds) {
     await sendNotification({
       userId: addedId,
       title: "Added to group",
       message: `You were added to "${conversation.name}"`,
       type: "CHAT_GROUP_ADDED",
-      link: `/chat/${conversationId}`,
+      link: "/chat",
     });
   }
 
+  await notifyConversationChanged(conversationId);
   return getConversationService(conversationId, userId);
 };
 
 const removeParticipantService = async (conversationId, userId, targetUserId) => {
   const participant = await assertParticipant(conversationId, userId);
+  const conversation = await repo.findConversationById(conversationId);
 
-  // Members can remove themselves ("leave group"); removing someone
-  // else requires admin/owner.
-  if (Number(targetUserId) !== Number(userId)) {
-    assertGroupAdmin(participant);
+  if (conversation.type !== CONVERSATION_TYPE.GROUP) {
+    throw new ApiError(400, "You can only remove people from a group");
   }
 
-  return repo.removeParticipant(conversationId, Number(targetUserId));
+  const targetId = Number(targetUserId);
+  const isSelf = targetId === Number(userId);
+
+  // Members can remove themselves ("exit group"); removing someone
+  // else requires admin/owner, and nobody can remove the owner.
+  if (!isSelf) {
+    assertGroupAdmin(participant);
+
+    const target = await repo.findParticipant(conversationId, targetId);
+    if (!target || target.leftAt) throw new ApiError(404, "That person is not in this group");
+    if (target.role === PARTICIPANT_ROLE.OWNER) {
+      throw new ApiError(403, "The group owner cannot be removed");
+    }
+  }
+
+  await repo.removeParticipant(conversationId, targetId);
+  removeUserFromRoom(targetId, `conversation:${conversationId}`);
+
+  // If the owner leaves, hand ownership to the longest-standing member
+  // so the group can still be managed.
+  if (isSelf && participant.role === PARTICIPANT_ROLE.OWNER) {
+    const successor = conversation.participants
+      .filter((p) => p.userId !== targetId)
+      .sort((a, b) => new Date(a.joinedAt) - new Date(b.joinedAt))[0];
+    if (successor) {
+      await repo.updateParticipantRole(conversationId, successor.userId, PARTICIPANT_ROLE.OWNER);
+    }
+  }
+
+  const userMap = await hydrateUsers([userId, targetId]);
+  await postSystemMessage(
+    conversationId,
+    userId,
+    isSelf
+      ? `${nameOf(userMap, userId)} left`
+      : `${nameOf(userMap, userId)} removed ${nameOf(userMap, targetId)}`
+  );
+
+  await notifyConversationChanged(conversationId, [targetId]);
+  return { conversationId };
 };
 
 // ---- Messages -------------------------------------------------------------
@@ -238,7 +350,7 @@ const sendMessageService = async (conversationId, senderId, data) => {
       title: "You were mentioned",
       message: `${userMap[senderId]?.fullName ?? "Someone"} mentioned you in a chat`,
       type: "CHAT_MENTION",
-      link: `/chat/${conversationId}`,
+      link: "/chat",
     });
   }
 
@@ -311,13 +423,13 @@ const searchMessagesService = async (userId, query) => {
   }));
 };
 
-// Used by call.service.js to drop a CALL_LOG system message into the
-// conversation when a call ends.
-const createSystemMessage = async (conversationId, senderId, body) => {
+// Used for group notices (type SYSTEM) and by call.service.js to drop a
+// CALL_LOG entry into the conversation when a call ends.
+const createSystemMessage = async (conversationId, senderId, body, type = MESSAGE_TYPE.CALL_LOG) => {
   const message = await repo.createMessage({
     conversationId,
     senderId,
-    type: MESSAGE_TYPE.CALL_LOG,
+    type,
     body,
     replyToId: undefined,
     mentions: [],
@@ -330,10 +442,9 @@ const createSystemMessage = async (conversationId, senderId, body) => {
 };
 
 /**
- * Org-wide directory of people the current user can start a chat
- * with. Chat is intentionally NOT restricted to direct
- * reports/managers (unlike task/goal assignment) — it's meant to work
- * like WhatsApp, where you can message anyone in the org.
+ * Org-wide directory of people the current user can start a chat with.
+ * Chat is intentionally NOT restricted to direct reports/managers
+ * (unlike task/goal assignment) - it works like WhatsApp.
  */
 const getDirectoryService = async (currentUserId) => {
   const users = await mysqlDb.users.findMany({

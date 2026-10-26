@@ -1,11 +1,48 @@
 const callService = require("./call.service");
 const { initiateCallSchema } = require("./chat.validation");
 
-const DISCONNECT_GRACE_MS = 12000; // 12s to reconnect before we treat it as a real hangup
+// callId -> timeout handle for the "nobody answered" timer
+const ringTimers = new Map();
 
-// key: `${callId}:${userId}` -> Timeout handle
-const pendingDisconnectTimers = new Map();
+const clearRingTimer = (callId) => {
+  const timer = ringTimers.get(callId);
+  if (timer) {
+    clearTimeout(timer);
+    ringTimers.delete(callId);
+  }
+};
 
+/**
+ * Tells every person on the call (caller, invitees, anyone still
+ * ringing) that it is over — goes to their personal `user:{id}` room,
+ * so a still-ringing incoming-call popup closes too — and pushes the
+ * "Video call · 5m 32s" / "Missed call" line into the chat live.
+ */
+const broadcastEnded = (io, result) => {
+  clearRingTimer(result.callId);
+
+  result.participantIds.forEach((id) => {
+    io.to(`user:${id}`).emit("call:ended", { callId: result.callId, status: result.status });
+  });
+
+  if (result.message) {
+    io.to(`conversation:${result.conversationId}`).emit("message:new", result.message);
+    result.participantIds.forEach((id) => {
+      io.to(`user:${id}`).emit("conversation:updated", {
+        conversationId: result.conversationId,
+        lastMessage: result.message,
+      });
+    });
+  }
+};
+
+/**
+ * P2P mesh signaling convention: when a new participant accepts a call,
+ * EXISTING participants are the ones who initiate the WebRTC offer to
+ * them (not the other way around) — this avoids both sides racing to
+ * send an offer at once ("glare"). The joiner just waits for offers
+ * from everyone already in the call and answers each.
+ */
 const registerCallHandlers = (io, socket) => {
   const userId = socket.user.id;
 
@@ -22,10 +59,27 @@ const registerCallHandlers = (io, socket) => {
         io.to(`user:${p.id}`).emit("call:incoming", {
           callId: call.id,
           conversationId,
+          conversationName: call.conversationName,
+          isGroup: call.isGroup,
           type,
           caller: call.startedBy,
         });
       });
+
+      // Nobody picked up in time -> missed call. Without this a call to
+      // an offline person rang forever and blocked every later call.
+      ringTimers.set(
+        call.id,
+        setTimeout(async () => {
+          ringTimers.delete(call.id);
+          try {
+            const result = await callService.missUnansweredCallService(call.id);
+            if (result) broadcastEnded(io, result);
+          } catch (err) {
+            console.error(`Error ending unanswered call ${call.id}:`, err.message);
+          }
+        }, callService.RING_TIMEOUT_MS)
+      );
 
       ack?.({ ok: true, call });
     } catch (err) {
@@ -36,11 +90,13 @@ const registerCallHandlers = (io, socket) => {
   socket.on("call:accept", async ({ callId }, ack) => {
     try {
       const { existingParticipants } = await callService.acceptCallService(callId, userId);
+      clearRingTimer(callId);
       socket.join(`call:${callId}`);
       socket.data.activeCallId = callId;
 
       ack?.({ ok: true, existingParticipants });
 
+      // Existing participants each initiate an offer to this new joiner.
       socket.to(`call:${callId}`).emit("call:user-joined", { callId, userId });
     } catch (err) {
       ack?.({ ok: false, error: err.message });
@@ -49,8 +105,9 @@ const registerCallHandlers = (io, socket) => {
 
   socket.on("call:decline", async ({ callId }, ack) => {
     try {
-      await callService.declineCallService(callId, userId);
+      const result = await callService.declineCallService(callId, userId);
       io.to(`call:${callId}`).emit("call:user-declined", { callId, userId });
+      if (result.ended) broadcastEnded(io, result);
       ack?.({ ok: true });
     } catch (err) {
       ack?.({ ok: false, error: err.message });
@@ -59,95 +116,51 @@ const registerCallHandlers = (io, socket) => {
 
   socket.on("call:leave", async ({ callId }, ack) => {
     try {
-      const { ended } = await callService.leaveCallService(callId, userId);
-      socket.to(`call:${callId}`).emit("call:user-left", { callId, userId, ended });
+      const result = await callService.leaveCallService(callId, userId);
+
+      socket.to(`call:${callId}`).emit("call:user-left", { callId, userId });
       socket.leave(`call:${callId}`);
       socket.data.activeCallId = null;
 
-      if (ended) {
-        io.to(`call:${callId}`).emit("call:ended", { callId });
-      }
+      if (result.ended) broadcastEnded(io, result);
       ack?.({ ok: true });
     } catch (err) {
       ack?.({ ok: false, error: err.message });
     }
   });
 
-  /**
-   * NEW: fired by the client immediately after its socket reconnects
-   * (see useCall.ts's "connect" listener) if it still thinks it's in
-   * an active call. Cancels the pending disconnect timer below and
-   * rejoins the signaling room on the new socket — the underlying
-   * RTCPeerConnection carrying the actual audio/video was never
-   * affected by the brief socket.io blip, so the call just keeps
-   * going once signaling is reconnected.
-   */
-  socket.on("call:rejoin", ({ callId }, ack) => {
-    const key = `${callId}:${userId}`;
-    const timer = pendingDisconnectTimers.get(key);
-    if (timer) {
-      clearTimeout(timer);
-      pendingDisconnectTimers.delete(key);
-    }
-
-    socket.join(`call:${callId}`);
-    socket.data.activeCallId = callId;
-    ack?.({ ok: true });
-  });
-
   // ---- WebRTC signaling relay (pairwise) ----
+  // The server never touches media — it only relays SDP/ICE between the
+  // two browsers named in the payload, and only for a call the sender is
+  // actually in.
+  const relay = (event) => (payload) => {
+    const { callId, toUserId, ...rest } = payload || {};
+    if (!callId || !toUserId || socket.data.activeCallId !== callId) return;
+    io.to(`user:${toUserId}`).emit(event, { callId, fromUserId: userId, ...rest });
+  };
 
-  socket.on("webrtc:offer", ({ callId, toUserId, sdp }) => {
-    io.to(`user:${toUserId}`).emit("webrtc:offer", { callId, fromUserId: userId, sdp });
-  });
-
-  socket.on("webrtc:answer", ({ callId, toUserId, sdp }) => {
-    io.to(`user:${toUserId}`).emit("webrtc:answer", { callId, fromUserId: userId, sdp });
-  });
-
-  socket.on("webrtc:ice-candidate", ({ callId, toUserId, candidate }) => {
-    io.to(`user:${toUserId}`).emit("webrtc:ice-candidate", { callId, fromUserId: userId, candidate });
-  });
+  socket.on("webrtc:offer", relay("webrtc:offer"));
+  socket.on("webrtc:answer", relay("webrtc:answer"));
+  socket.on("webrtc:ice-candidate", relay("webrtc:ice-candidate"));
 };
 
 /**
- * FIX: previously ended the call THE INSTANT any socket disconnected,
- * including an ordinary websocket hiccup that had nothing to do with
- * the user actually leaving — this was ending live calls out from
- * under people mid-conversation. Now waits DISCONNECT_GRACE_MS to see
- * whether they reconnect and rejoin the call room (via "call:rejoin")
- * before actually treating it as a real hangup.
+ * Best-effort cleanup for a socket that disconnects mid-call (closed
+ * tab, dead network, lid closed) without ever emitting call:leave.
+ * Called from socket/index.js's disconnect handler.
  */
-const handleCallDisconnect = (io, socket) => {
+const handleCallDisconnect = async (io, socket) => {
   const callId = socket.data?.activeCallId;
   if (!callId) return;
 
-  const userId = socket.user.id;
-  const key = `${callId}:${userId}`;
-
-  const timer = setTimeout(async () => {
-    pendingDisconnectTimers.delete(key);
-
-    // Did a (new) socket for this user rejoin the call room in the meantime?
-    const room = io.sockets.adapter.rooms.get(`call:${callId}`);
-    const stillPresent =
-      room &&
-      [...room].some((socketId) => io.sockets.sockets.get(socketId)?.user?.id === userId);
-
-    if (stillPresent) return; // they reconnected in time — nothing to do
-
-    try {
-      const { ended } = await callService.leaveCallService(callId, userId);
-      io.to(`call:${callId}`).emit("call:user-left", { callId, userId, ended });
-      if (ended) {
-        io.to(`call:${callId}`).emit("call:ended", { callId });
-      }
-    } catch (err) {
-      console.error(`Error in handleCallDisconnect for call ${callId}:`, err.message);
-    }
-  }, DISCONNECT_GRACE_MS);
-
-  pendingDisconnectTimers.set(key, timer);
+  try {
+    const result = await callService.leaveCallService(callId, socket.user.id);
+    io.to(`call:${callId}`).emit("call:user-left", { callId, userId: socket.user.id });
+    if (result.ended) broadcastEnded(io, result);
+  } catch (err) {
+    // Call may already be ended/cleaned up — safe to ignore.
+    console.error(`Error in handleCallDisconnect for call ${callId}:`, err.message);
+  }
 };
 
 module.exports = registerCallHandlers;

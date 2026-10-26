@@ -5,6 +5,7 @@ const registerChatHandlers = require("../module/chat/chat.socket");
 const registerCallHandlers = require("../module/chat/call.socket");
 const { handleCallDisconnect } = require("../module/chat/call.socket");
 const { initEmailSocket } = require("../module/email/Email.socket");
+const { setIo } = require("./emitter");
 
 // userId -> Set<socketId> — supports multiple tabs/devices per user
 // without flip-flopping presence on every tab close.
@@ -56,6 +57,8 @@ const createSocketServer = (httpServer) => {
   const io = new Server(httpServer, {
     cors: { origin: CORS_ORIGINS, credentials: true },
   });
+
+  setIo(io); // lets REST services emit realtime events (see emitter.js)
 
   io.use(socketAuth);
 
